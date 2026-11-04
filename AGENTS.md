@@ -4,7 +4,7 @@ Guidance for AI agents working in this repository. Read this before making any c
 
 ## What this is
 
-**my-morphe-builder** — a personal, private fork of [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module). It builds a **patched Notesnook APK** in the cloud with [GitHub Actions](.github/workflows/), using [hxreborn/morphe-patches](https://github.com/hxreborn/morphe-patches) and the [Morphe](https://morphe.software) CLI. Notesnook is the primary target; a few more apps are planned (unannounced).
+**my-morphe-builder** — a personal, private fork of [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module). It builds patched **Notesnook** and **Google Photos** APKs in the cloud with [GitHub Actions](.github/workflows/), using [hxreborn/morphe-patches](https://github.com/hxreborn/morphe-patches) (Notesnook) and [Akash-Sriram/morphe-google-photos](https://github.com/Akash-Sriram/morphe-google-photos) (Google Photos, derived from De-Vanced) with the [Morphe](https://morphe.software) CLI.
 
 The flow: `ci.yml` (daily cron + manual dispatch) → checks whether the newest patch release is newer than what was last built (`--config-update` against `build.md` on the `update` branch) → if so, `build.yml` runs: downloads the stock APK, patches it, signs it, uploads it to a GitHub Release. **Release-only flow** — no Magisk module, no in-app update-check patch, no Telegram notifications.
 
@@ -12,8 +12,8 @@ The flow: `ci.yml` (daily cron + manual dispatch) → checks whether the newest 
 
 1. **arm64-v8a only.** Never introduce other ABIs (no armeabi-v7a, x86, x86_64, multi-ABI builds) without explicit approval. The Notesnook `arch` is `arm64-v8a` and `utils.sh` refuses bundles without arm64-v8a native libs (`arm64_ok()`).
 2. **Bundled `ks.keystore` signs everything.** Do not add per-app key management or secret handling. Patched APKs can't update over official/Play installs; that's accepted.
-3. **apkeep/APKPure path stays dormant but working.** Don't delete the `apkpure` download source, the apkeep workflow step, or the `arm64_ok` guard. The user tests it later. If you touch it, keep `apkeep -d apk-pure` as its only download source.
-4. **Don't bump Notesnook's `version` without checking patch support first.** Patches target specific versions — verify the change against `https://github.com/hxreborn/morphe-patches/blob/main/patches-list.json` (`compatiblePackages` for `com.streetwriters.notesnook`). Changing `version` blindly breaks the build.
+3. **apkeep/APKPure path stays functional and is the Google Photos source.** Don't delete the `apkpure` download source, the apkeep workflow step, or the `arm64_ok` guard. Keep `apkeep -d apk-pure` as apkeep's only download source. Notesnook keeps the official Notesnook endpoint.
+4. **Don't bump app `version`s without checking patch support first.** Patches target specific versions — verify the change against the bundle's `patches-list.json` (hxreborn's for Notesnook; Akash-Sriram/morphe-google-photos' for Google Photos, which supports only `7.99.0.1007655401` today). Changing `version` blindly breaks the build.
 5. **Agent edits files; the user pushes.** No committing/pushing unless the user explicitly asks. No `git remote` operations, no `gh` calls (there is no `gh` here).
 6. **Patches-version policy:** `patches-version = "latest"` is intentional. Don't pin it.
 7. **No scraped/unofficial APK sources** without the user's say-so. Allowed sources are only what's already in `config.toml`/`utils.sh` (`official-dlurl`, `apkpure-dlurl`, `direct-dlurl`, `archive-dlurl`, `apkmirror-dlurl`).
@@ -51,9 +51,10 @@ The flow: `ci.yml` (daily cron + manual dispatch) → checks whether the newest 
 
 ## Currently in scope
 
-- Notesnook only, built from the **official** arm64-v8a endpoint (`https://notesnook.com/api/v1/releases/android/latest/arm64-v8a`, a 302 to the official GitHub release asset) via `official-dlurl`.
-- Notesnook on APKPure: 3.4.12/3.4.13/3.4.15 are armeabi-v7a-only — do not switch to it without pinning `version = "3.4.14"` and knowing why.
-- `version = "auto"` is deliberate: highest version supported by the patches. If the official endpoint serves a newer release than the patches support, the patch step fails loudly — expected; wait for a patch update or pin `version`.
+- **Notesnook** — built from the **official** arm64-v8a endpoint (`https://notesnook.com/api/v1/releases/android/latest/arm64-v8a`, a 302 to the official GitHub release asset) via `official-dlurl`.
+  - Notesnook on APKPure: 3.4.12/3.4.13/3.4.15 are armeabi-v7a-only — do not switch to it without pinning `version = "3.4.14"` and knowing why.
+  - `version = "auto"` is deliberate: highest version supported by the patches. If the official endpoint serves a newer release than the patches support, the patch step fails loudly — expected; wait for a patch update or pin `version`.
+- **Google Photos** — built from APKPure via apkeep (`-d apk-pure` only). The only patch-supported version is `7.99.0.1007655401` (pinned). APKPure serves it as a universal APK (all ABIs, no XAPK), so the patch step's `--striplibs arm64-v8a` removes everything but arm64-v8a. The MGP patches rename the package to `app.morphe.android.apps.photos` (GmsCore support, default on) — do not `pkg-name` that; the patches declare `com.google.android.apps.photos` as the input package. When a newer Google Photos version appears in MGP's patches-list.json, bump `version` deliberately (and check APKPure availability + arm64-only policy).
 
 ## Pitfalls (learn from history)
 
@@ -72,8 +73,8 @@ The flow: `ci.yml` (daily cron + manual dispatch) → checks whether the newest 
 
 ## Roadmap (as told by the user)
 
-- A few more selected apps will be added soon — chosen apps will be provided later; structure configs to allow it.
-- The apkeep path will be evaluated later by the user; keep it working.
+- **Google Photos** was added as the second app (from `Akash-Sriram/morphe-google-photos`). More selected apps may be added — chosen apps will be provided later; structure configs to allow it.
+- The apkeep path is now used by Google Photos (Google Photos has no official arm64 direct-download endpoint); Notesnook keeps the official endpoint.
 - Upstream syncs are periodic but deliberate — agents propose, the user merges.
 - Personal, private project; no template ambitions for now — don't add template scaffolding or public-facing polish.
 

@@ -153,18 +153,25 @@ get_prebuilts() {
 				extensions_ext="${extensions_ext#*.}"
 				if [ -z "$extensions_ext" ]; then
 					# third-party bundles (e.g. hxreborn/morphe-patches) ship a single .mpp with
-					# extensions/extension.mpe and no shared.* extension — nothing to rewrite
+					# extensions/extension.mpe and no shared.* extension - nothing to rewrite
 					pr "No extensions/shared.* in '$(basename "$file")', skipping integrations checks removal" >&2
 				else
-					(
-						mkdir -p "${file}-zip" || return 1
-						unzip -qo "${file}" -d "${file}-zip" || return 1
-						java -cp "${BIN_DIR}/paccer.jar:${BIN_DIR}/dexlib2.jar" com.jhc.Main "${file}-zip/extensions/shared.${extensions_ext}" "${file}-zip/extensions/shared-patched.${extensions_ext}" || return 1
-						mv -f "${file}-zip/extensions/shared-patched.${extensions_ext}" "${file}-zip/extensions/shared.${extensions_ext}" || return 1
-						rm "${file}" || return 1
-						cd "${file}-zip" || abort
-						zip -0rq "${CWD}/${file}" . || return 1
-					) >&2
+					# rewrite the shared extension in-place, but never fail the build over it -
+					# on any error keep the original bundle (integrations checks remain, patch still works)
+					if ! (
+						set -e
+						mkdir -p "${file}-zip"
+						unzip -qo "${file}" -d "${file}-zip"
+						java -cp "${BIN_DIR}/paccer.jar:${BIN_DIR}/dexlib2.jar" com.jhc.Main "${file}-zip/extensions/shared.${extensions_ext}" "${file}-zip/extensions/shared-patched.${extensions_ext}"
+						mv -f "${file}-zip/extensions/shared-patched.${extensions_ext}" "${file}-zip/extensions/shared.${extensions_ext}"
+						cd "${file}-zip"
+						zip -0rq "${CWD}/${file}.pactmp" .
+					) >&2; then
+						wpr "Could not remove integrations checks from '$(basename "$file")'; keeping the original bundle"
+						rm -f "${file}.pactmp"
+					else
+						mv -f "${file}.pactmp" "${file}"
+					fi
 					rm -r "${file}-zip" || :
 				fi
 			fi
@@ -638,21 +645,25 @@ dl_apkpure() {
 		return 1
 	fi
 	# 'arch' is passed through to apkeep when set to a specific abi (default on apkpure is "all")
-	local opts="acknowledge_dangers=true"
+	# note: apkeep names the output "<id>[@<version>[@<arch>]].<apk|xapk>"
+	local opts="acknowledge_dangers=true" arch_suffix=""
 	if [ "$arch" != "all" ]; then
 		local apkeep_arch="$arch"
 		if [ "$arch" = "arm-v7a" ]; then apkeep_arch="armeabi-v7a"; fi
-		if [ "$arch" != "both" ]; then opts+=",arch=${apkeep_arch}"; fi
+		if [ "$arch" != "both" ]; then opts+=",arch=${apkeep_arch}"; arch_suffix="@${apkeep_arch}"; fi
 	fi
 	if ! "$APKEEP" -a "${app_id}@${version}" -d apk-pure -o "$opts" "$TEMP_DIR"; then
 		epr "apkeep failed to download '${app_id}@${version}' from apkpure"
 		return 1
 	fi
-	local dlfile
-	dlfile=$(find "$TEMP_DIR" -maxdepth 1 \( -name "${app_id}@${version}.apk" -o -name "${app_id}@${version}.xapk" \) -print -quit)
-	if [ -z "$dlfile" ]; then
-		dlfile=$(find "$TEMP_DIR" -maxdepth 1 \( -name "${app_id}.apk" -o -name "${app_id}.xapk" \) -print -quit)
-	fi
+	local dlfile="" cand
+	for cand in \
+		"${app_id}@${version}${arch_suffix}.apk" "${app_id}@${version}${arch_suffix}.xapk" \
+		"${app_id}@${version}.apk" "${app_id}@${version}.xapk" \
+		"${app_id}${arch_suffix}.apk" "${app_id}${arch_suffix}.xapk" \
+		"${app_id}.apk" "${app_id}.xapk"; do
+		if [ -f "$TEMP_DIR/$cand" ]; then dlfile="$TEMP_DIR/$cand"; break; fi
+	done
 	if [ -z "$dlfile" ]; then
 		epr "apkeep did not produce an apk/xapk for '${app_id}@${version}'"
 		return 1
@@ -673,7 +684,7 @@ dl_apkpure() {
 # vendor's download endpoint (e.g. Notesnook's API, which 302-redirects to the
 # official GitHub release asset). 'pkg-name' must be set in the config as well.
 # Note: when the endpoint serves a version newer than the patches support, the
-# patch step fails loudly — that's expected; wait for a patch update or pin 'version'.
+# patch step fails loudly - that's expected; wait for a patch update or pin 'version'.
 get_official_resp() {
 	__OFFICIAL_URL__=$(sed 's/[[:space:]]//g' <<<"$1")
 	local code
