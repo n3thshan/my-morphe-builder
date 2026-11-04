@@ -1,4 +1,4 @@
-GooglePhotos: 7.99.0.1007655401  
+GooglePhotos: 7.99.0.1012983279  
 Notesnook: 3.4.15  
 
 Install [Microg](https://github.com/MorpheApp/MicroG-RE/) for non-root YouTube and YT Music APKs  
