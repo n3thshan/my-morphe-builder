@@ -57,6 +57,9 @@ enable-update-checks = true
 apkmirror-dlurl = "https://www.apkmirror.com/apk/inc/app"
 # download from APKPure with apkeep (APKPure ONLY). value is the app's package id on APKPure
 apkpure-dlurl = "com.streetwriters.notesnook"
+# download directly from the vendor's official endpoint (302 -> release asset). requires 'pkg-name' too
+pkg-name = "com.streetwriters.notesnook"
+official-dlurl = "https://notesnook.com/api/v1/releases/android/latest/arm64-v8a"
 # direct download url. the url must point to an apk file with name format shown in this example
 direct-dlurl = "https://website/com.google.android.youtube-20.40.45-all.apk"
 

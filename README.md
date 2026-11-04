@@ -2,17 +2,19 @@
 
 Fork of [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module) customized to build a **Notesnook** APK patched with [hxreborn/morphe-patches](https://github.com/hxreborn/morphe-patches) (Unlock pro + Material You theme) using [Morphe](https://morphe.software).
 
-The stock APK is downloaded **from APKPure only**, with [apkeep](https://github.com/EFForg/apkeep) (pinned to v1.1.0 in the workflow, and only ever invoked with `-d apk-pure`). The GitHub Actions workflows build everything in the cloud  -  see [`config.toml`](./config.toml), [`CONFIG.md`](./CONFIG.md) and `.github/workflows/`.
+The stock APK is downloaded **from the official Notesnook site** (`notesnook.com/api/v1/releases/android/latest/arm64-v8a`). The [apkeep](https://github.com/EFForg/apkeep)-based APKPure path is kept in the repo for later testing but unused. The GitHub Actions workflows build everything in the cloud  -  see [`config.toml`](./config.toml), [`CONFIG.md`](./CONFIG.md) and `.github/workflows/`.
 
 ## What it does
 
 * On a daily schedule (or `workflow_dispatch`), the CI checks whether the latest `hxreborn/morphe-patches` release is newer than what was last built.
-* If so, it downloads the Notesnook APK/XAPK from APKPure with apkeep (currently `com.streetwriters.notesnook`, version `auto` → highest version supported by the patches, e.g. `3.4.15`), merges the XAPK with APKEditor if needed, patches it with morphe-cli and signs it with the bundled key prebuilt into the repo, then attaches the APK to a GitHub Release.
-* **APKPure warning**: [apkeep's docs note APKPure is a third-party APK mirror](https://github.com/EFForg/apkeep/blob/master/USAGE-apkpure.md) which has been caught distributing modified apps, so only use this if you accept that risk. Notesnook is open source, so you can compare its source yourself if you want to be sure.
+* If so, it downloads the **official arm64-v8a APK** from `notesnook.com/api/v1/releases/android/latest/arm64-v8a` (a 302 redirect to the official GitHub release asset) with the builder's `official-dlurl` support, patches it with morphe-cli and signs it with the bundled key prebuilt into the repo, then attaches the APK to a GitHub Release. The apkeep/APKPure path is kept in the repo for later testing but is not used.
+* **Note**: the official endpoint always serves the newest release; if Notesnook ships a version newer than the patches support, the build fails loudly at the patch step (expected — wait for a patches update or pin `version` in [`config.toml`](./config.toml)).
+* **arm64-v8a only.** The project does not support other ABIs. The official APK is already arm64-v8a-only; the available APKPure XAPKs (3.4.12/3.4.13/3.4.15) are 32-bit-only, which is why the official endpoint is the default source.
+* **APKPure warning** (if you switch to the apkeep source): [apkeep's docs note APKPure is a third-party APK mirror](https://github.com/EFForg/apkeep/blob/master/USAGE-apkpure.md) which has been caught distributing modified apps, so only use it if you accept that risk.
 
 ## Adding more apps later
 
-The builder stays generic  -  future apps need only a new table in [`config.toml`](./config.toml) with their `apkpure-dlurl` (the package id on APKPure) and `patches-source` (any Morphe-patches repo, e.g. another third-party bundle). APKPure remains the only download source used with apkeep.
+The builder stays generic  -  future apps need only a new table in [`config.toml`](./config.toml) with a download source (`official-dlurl` / `direct-dlurl` / `apkpure-dlurl` for apkeep) and `patches-source` (any Morphe-patches repo, e.g. another third-party bundle). The apkeep path uses APKPure only.
 
 ## Using your own fork
 

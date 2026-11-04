@@ -11,6 +11,12 @@ patches-source = "hxreborn/morphe-patches"
 patches-version = "latest"
 cli-source = "MorpheApp/morphe-cli"
 cli-version = "latest"
-version = "auto" # 'auto' picks the highest version supported by the patches (currently 3.4.15)
-# package id on APKPure; downloaded with apkeep (-d apk-pure ONLY)
-apkpure-dlurl = "com.streetwriters.notesnook"
+# arm64-v8a only by policy; the official endpoint serves the arm64-v8a build
+version = "auto" # highest version supported by the patches
+arch = "arm64-v8a"
+# official Notesnook download endpoint (302 -> official GitHub release asset)
+pkg-name = "com.streetwriters.notesnook"
+official-dlurl = "https://notesnook.com/api/v1/releases/android/latest/arm64-v8a"
+# alternative: apkeep from APKPure (kept for later testing). WARNING: there the
+# 3.4.12/3.4.13/3.4.15 XAPKs are armeabi-v7a-only, so also pin version = "3.4.14".
+# apkpure-dlurl = "com.streetwriters.notesnook"

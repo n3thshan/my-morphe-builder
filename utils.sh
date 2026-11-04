@@ -5,7 +5,7 @@ CWD=$(pwd)
 TEMP_DIR="temp"
 BIN_DIR="bin"
 BUILD_DIR="build"
-DL_SRCS=("direct" "archive" "apkmirror" "apkpure")
+DL_SRCS=("direct" "archive" "apkmirror" "apkpure" "official")
 
 if [ "${GITHUB_TOKEN-}" ]; then GH_HEADER="Authorization: token ${GITHUB_TOKEN}"; else GH_HEADER=; fi
 NEXT_VER_CODE=${NEXT_VER_CODE:-$(date +'%Y%m%d')}
@@ -591,6 +591,16 @@ get_direct_resp() { __DIRECT_APKNAME__=$(awk -F/ '{print $NF}' <<<"$1"); }
 # APKPure downloads go through apkeep (https://github.com/EFForg/apkeep), which
 # is only ever invoked with the apk-pure download source. The 'apkpure-dlurl'
 # config option holds the app's package id on APKPure (e.g. com.streetwriters.notesnook).
+# returns 0 if the bundle has arm64-v8a native libs (or none at all); 1 otherwise.
+# this project only supports arm64-v8a.
+arm64_ok() {
+	local dump
+	dump=$(unzip -l "$1" 2>/dev/null)
+	if grep -qE 'lib/(x86|x86_64|armeabi-v7a|armeabi)/' <<<"$dump" && ! grep -qE 'lib/arm64-v8a/|config\.arm64_v8a\.apk' <<<"$dump"; then
+		return 1
+	fi
+	return 0
+}
 get_apkpure_resp() {
 	local app_id="$1"
 	if [ ! -x "$APKEEP" ]; then
@@ -615,8 +625,13 @@ dl_apkpure() {
 	local app_id=$1 version=${2// /} output=$3 arch=$4 _dpi=$5
 	version="${version#v}"
 	if [ -f "${output}.xapk" ]; then
-		merge_splits "${output}.xapk" "$output"
-		return $?
+		if [[ $arch == *arm64* ]] && ! arm64_ok "${output}.xapk"; then
+			epr "Cached bundle '${output}.xapk' has no arm64-v8a native libraries; deleting and re-downloading"
+			rm -f "${output}.xapk"
+		else
+			merge_splits "${output}.xapk" "$output"
+			return $?
+		fi
 	fi
 	if [ ! -x "$APKEEP" ]; then
 		epr "apkeep binary not found at '$APKEEP'"
@@ -642,11 +657,53 @@ dl_apkpure() {
 		epr "apkeep did not produce an apk/xapk for '${app_id}@${version}'"
 		return 1
 	fi
+	if [[ $arch == *arm64* ]] && ! arm64_ok "$dlfile"; then
+		epr "Downloaded bundle for '${app_id}@${version}' contains only non-arm64-v8a native libraries; this project only supports arm64-v8a"
+		return 1
+	fi
 	if [ "${dlfile##*.}" = "xapk" ]; then
 		mv -f "$dlfile" "${output}.xapk"
 		merge_splits "${output}.xapk" "$output"
 	else
 		mv -f "$dlfile" "$output"
+	fi
+}
+# -------------------- official --------------------
+# Official app downloads: config option 'official-dlurl' points directly at the
+# vendor's download endpoint (e.g. Notesnook's API, which 302-redirects to the
+# official GitHub release asset). 'pkg-name' must be set in the config as well.
+# Note: when the endpoint serves a version newer than the patches support, the
+# patch step fails loudly — that's expected; wait for a patch update or pin 'version'.
+get_official_resp() {
+	__OFFICIAL_URL__=$(sed 's/[[:space:]]//g' <<<"$1")
+	local code
+	# 1-byte ranged GET: works even on signed asset URLs that dislike HEAD
+	code=$(curl -s -o /dev/null -w "%{http_code}" -L --connect-timeout 10 --retry 1 -r 0-0 "$__OFFICIAL_URL__" || :)
+	if [[ ! "$code" =~ ^(200|206)$ ]]; then
+		epr "Official APK endpoint returned HTTP ${code:-000}: $__OFFICIAL_URL__"
+		return 1
+	fi
+	return 0
+}
+get_official_vers() {
+	epr "official-dlurl serves 'latest' and has no version list; set 'version' in the config or use patches-resolved 'auto'"
+	return 1
+}
+get_official_pkg_name() {
+	epr "official source requires 'pkg-name' in the config (e.g. pkg-name = \"com.example.app\")"
+	return 1
+}
+dl_official() {
+	local url=$1 version=${2// /} output=$3 arch=$4 _dpi=$5
+	version="${version#v}"
+	if ! req "$url" "$output"; then
+		epr "Could not download the official APK from '$url'"
+		return 1
+	fi
+	if [[ $arch == *arm64* ]] && ! arm64_ok "$output"; then
+		epr "Official APK from '$url' contains no arm64-v8a native libraries; this project only supports arm64-v8a"
+		rm -f "$output"
+		return 1
 	fi
 }
 # --------------------------------------------------
