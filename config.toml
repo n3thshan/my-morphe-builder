@@ -1,0 +1,16 @@
+# my-morphe-builder — builds Notesnook APK with hxreborn/morphe-patches
+# see https://github.com/hxreborn/morphe-patches for what the patches do
+# see CONFIG.md for the full list of options
+enable-module-update = false # release-only flow, no Magisk module update manifests
+parallel-jobs = 1
+
+[Notesnook]
+app-name = "Notesnook"
+build-mode = "apk" # 'both', 'apk' or 'module'
+patches-source = "hxreborn/morphe-patches"
+patches-version = "latest"
+cli-source = "MorpheApp/morphe-cli"
+cli-version = "latest"
+version = "auto" # 'auto' picks the highest version supported by the patches (currently 3.4.15)
+# package id on APKPure; downloaded with apkeep (-d apk-pure ONLY)
+apkpure-dlurl = "com.streetwriters.notesnook"
