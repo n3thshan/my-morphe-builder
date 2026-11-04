@@ -6,8 +6,18 @@ on:
         type: boolean
         required: false
         default: true
+      force_all:
+        type: boolean
+        required: false
+        default: false
 
   workflow_dispatch:
+    inputs:
+      force_all:
+        description: "Build all enabled apps, even if unchanged"
+        type: boolean
+        required: false
+        default: false
 
 jobs:
   run:
@@ -35,15 +45,22 @@ jobs:
           bin/apkeep --version
 
       - name: Update config
-        if: ${{ inputs.from_ci }}
+        id: update_cfg
+        if: ${{ inputs.force_all != true }}
         run: |
-          if git checkout origin/update build.md; then
+          SKIP=false
+          if git checkout origin/update build.md 2>/dev/null; then
+            git checkout origin/update build-state.txt 2>/dev/null || :
             UPDATE_CFG=$(bash ./build.sh config.toml --config-update)
             if [ "$UPDATE_CFG" ]; then
               echo "'$UPDATE_CFG'"
               echo "$UPDATE_CFG" > config.json
+            elif [ -f build-state.txt ]; then
+              echo "Nothing changed since the last build - skipping."
+              SKIP=true
             fi
           fi
+          echo "SKIP=$SKIP" >> "$GITHUB_OUTPUT"
 
       - name: Get next version code
         id: next_ver_code
@@ -55,6 +72,7 @@ jobs:
           echo "NEXT_VER_CODE=$((TAG + 1))" >> $GITHUB_OUTPUT
 
       - name: Build modules/APKs
+        if: steps.update_cfg.outputs.SKIP != 'true'
         run: if [ -f "config.json" ]; then bash ./build.sh config.json; else bash ./build.sh config.toml; fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -63,6 +81,7 @@ jobs:
 
       - name: Get output
         id: get_output
+        if: steps.update_cfg.outputs.SKIP != 'true'
         run: |
           DELIM="$(openssl rand -hex 8)"
           echo "BUILD_LOG<<${DELIM}" >> "$GITHUB_OUTPUT"
@@ -71,6 +90,7 @@ jobs:
           cp -f build.md build.tmp
       
       - name: Upload release
+        if: steps.update_cfg.outputs.SKIP != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
@@ -86,9 +106,19 @@ jobs:
 
       - name: Update modules changelog and update json
         id: update_config
+        if: steps.update_cfg.outputs.SKIP != 'true'
         run: |
           git checkout -f update || git switch --discard-changes --orphan update
           cp -f build.tmp build.md
+          touch build-state.txt
+          : > built-state-updates.txt
+          if [ -f temp/seed-state.txt ]; then cat temp/seed-state.txt >> built-state-updates.txt; fi
+          if [ -f temp/built-state.txt ]; then cat temp/built-state.txt >> built-state-updates.txt; fi
+          if [ -s built-state-updates.txt ]; then
+            awk -F'|' 'NR==FNR { new[$1]=$0; next } { if (!($1 in new)) print } END { for (t in new) print new[t] }' built-state-updates.txt build-state.txt | sort > build-state.tmp
+            mv -f build-state.tmp build-state.txt
+          fi
+          rm -f built-state-updates.txt
           get_update_json() {
             echo "{
             \"version\": \"$1\",
@@ -114,11 +144,12 @@ jobs:
           find . -name "*-update.json" | grep . || : >dummy-update.json
 
       - name: Commit module json changes
+        if: steps.update_cfg.outputs.SKIP != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
       
-          git add build.md *-update.json
+          git add build.md *-update.json build-state.txt
       
           if ! git diff --cached --quiet; then
             git commit -m "Bump version ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"

@@ -194,10 +194,14 @@ set_prebuilts() {
 
 config_update() {
 	if [ ! -f build.md ]; then abort "build.md not available"; fi
-	declare -A sources
 	: >"$TEMP_DIR"/skipped
+	: >"$TEMP_DIR"/seed-state.txt
 	local upped=()
 	local prcfg=false
+	# per-app build state from the update branch: <table>|<patches-src>|<patches-asset>|<configured-version>
+	local state_file="build-state.txt"
+	[ -f "$state_file" ] || state_file=""
+	declare -A latest_assets=()
 	for table_name in $(toml_get_table_names); do
 		if [ -z "$table_name" ]; then continue; fi
 		t=$(toml_get_table "$table_name")
@@ -205,34 +209,78 @@ config_update() {
 		if [ "$enabled" = "false" ]; then continue; fi
 		PATCHES_SRC=$(toml_get "$t" patches-source) || PATCHES_SRC=$DEF_PATCHES_SRC
 		PATCHES_VER=$(toml_get "$t" patches-version) || PATCHES_VER=$DEF_PATCHES_VER
-		if [[ -v sources["$PATCHES_SRC/$PATCHES_VER"] ]]; then
-			if [ "${sources["$PATCHES_SRC/$PATCHES_VER"]}" = 1 ]; then upped+=("$table_name"); fi
+		CFG_VER=$(toml_get "$t" version) || CFG_VER="auto"
+
+		local src_key="${PATCHES_SRC}/${PATCHES_VER}" last_patches="" resp
+		if [ -n "${latest_assets[$src_key]+x}" ]; then
+			last_patches="${latest_assets[$src_key]}"
 		else
-			sources["$PATCHES_SRC/$PATCHES_VER"]=0
 			local rv_rel="https://api.github.com/repos/${PATCHES_SRC}/releases"
 			if [ "$PATCHES_VER" = "dev" ]; then
-				last_patches=$(gh_req "$rv_rel" - | jq -e -r '.[0]') || continue
+				resp=$(gh_req "$rv_rel" -) && last_patches=$(jq -e -r '.[0]' <<<"$resp") || last_patches=""
 			elif [ "$PATCHES_VER" = "latest" ]; then
-				last_patches=$(gh_req "$rv_rel/latest" -) || continue
+				last_patches=$(gh_req "$rv_rel/latest" -) || last_patches=""
 			else
-				last_patches=$(gh_req "$rv_rel/tags/${PATCHES_VER}" -) || continue
+				last_patches=$(gh_req "$rv_rel/tags/${PATCHES_VER}" -) || last_patches=""
 			fi
-			tag_name=$(jq -e -r '.tag_name' <<<"$last_patches") || abort "config_update error: No tag name"
-			if ! last_patches=$(jq -e -r '.assets[] | select(.name | (endswith("asc") or endswith("json")) | not) | .name' <<<"$last_patches"); then
-				abort "config_update error: '$last_patches'"
-			fi
-			if [ "$last_patches" ]; then
-				local name_ext="${last_patches##*.}"
-				last_patches="patches-${tag_name#v}.${name_ext}"
-
-				if ! OP=$(grep -m1 "^Patches: ${PATCHES_SRC}/${last_patches}" build.md); then
-					sources["$PATCHES_SRC/$PATCHES_VER"]=1
-					prcfg=true
-					upped+=("$table_name")
-				else
-					echo "$OP" >>"$TEMP_DIR"/skipped
+			if [ -n "$last_patches" ]; then
+				local tag_name
+				tag_name=$(jq -e -r '.tag_name' <<<"$last_patches") || abort "config_update error: No tag name"
+				if ! last_patches=$(jq -e -r '.assets[] | select(.name | (endswith("asc") or endswith("json")) | not) | .name' <<<"$last_patches"); then
+					abort "config_update error: '$last_patches'"
+				fi
+				if [ "$last_patches" ]; then
+					local name_ext="${last_patches##*.}"
+					last_patches="patches-${tag_name#v}.${name_ext}"
 				fi
 			fi
+			latest_assets[$src_key]="$last_patches"
+		fi
+		if [ -z "$last_patches" ]; then continue; fi
+
+		local state_line="" state_src="" state_asset="" state_ver=""
+		if [ -n "$state_file" ]; then
+			state_line=$(awk -F'|' -v t="$table_name" '$1 == t { print; exit }' "$state_file" 2>/dev/null) || :
+			if [ -n "$state_line" ]; then
+				IFS='|' read -r _ state_src state_asset state_ver <<<"$state_line"
+			fi
+		fi
+
+		local changed=false reason="" OP="" app_line="" recorded_ver=""
+		if [ -n "$state_line" ]; then
+			if [ "$state_src" != "$PATCHES_SRC" ]; then
+				changed=true reason="patch source changed"
+			elif [ "$state_asset" != "$last_patches" ]; then
+				changed=true reason="patches updated"
+			elif [ "$CFG_VER" != "$state_ver" ]; then
+				changed=true reason="configured version changed"
+			fi
+		elif [ -n "$state_file" ]; then
+			# state file exists but has no line for this app (newly added): build it
+			changed=true reason="no recorded build"
+		else
+			# migration path: no state file yet - fall back to build.md, then seed state below
+			if ! OP=$(grep -m1 "^Patches: ${PATCHES_SRC}/${last_patches}" build.md); then
+				changed=true reason="patches updated"
+			fi
+			app_line=$(grep -m1 -E "^${table_name}( \(|:)" build.md 2>/dev/null) || :
+			if [ -n "$app_line" ]; then recorded_ver="${app_line##*: }"; fi
+			if [ -z "$recorded_ver" ]; then
+				changed=true reason="no recorded build"
+			elif [ "$CFG_VER" != "auto" ] && [ "$CFG_VER" != "$recorded_ver" ]; then
+				changed=true reason="configured version changed"
+			fi
+			if [ "$changed" = false ]; then
+				printf '%s|%s|%s|%s\n' "$table_name" "$PATCHES_SRC" "$last_patches" "$CFG_VER" >>"$TEMP_DIR"/seed-state.txt
+				echo "${table_name}: ${PATCHES_SRC}/${last_patches} (up to date, recorded)" >>"$TEMP_DIR"/skipped
+				continue
+			fi
+		fi
+
+		if [ "$changed" = true ]; then
+			prcfg=true
+			upped+=("$table_name")
+			echo "${table_name}: ${reason}" >>"$TEMP_DIR"/skipped
 		fi
 	done
 	if [ "$prcfg" = true ]; then
@@ -1030,6 +1078,8 @@ build_rv() {
 		popd >/dev/null || :
 		pr "Built ${table} (root): '${BUILD_DIR}/${module_output}'"
 	done
+	# record what this app was built from (merged into build-state.txt on the update branch)
+	echo "${args[table_key]}|${args[patches_src]}|$(basename "${args[ptjar]}")|${args[version]}" >>"$TEMP_DIR/built-state.txt"
 }
 
 list_args() { tr -d '\t\r' <<<"$1" | tr -s ' ' | sed 's/" "/"\n"/g' | sed 's/\([^"]\)"\([^"]\)/\1'\''\2/g' | grep -v '^$' || :; }

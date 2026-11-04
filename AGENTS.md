@@ -43,11 +43,14 @@ The flow: `ci.yml` (daily cron + manual dispatch) → checks whether the newest 
 
 ## Release flow
 
-1. `ci.yml` wakes (cron 16:00 UTC, or `workflow_dispatch`) → `should_build` job runs `bash ./build.sh config.toml --config-update`.
-2. If the newest patch release isn't already in `build.md` (on `origin/update`) → `build.yml` runs → builds → `gh release create/edit` with `./build/*`.
-3. `build.md` is written during the build and committed to the `update` branch; the daily job compares against it to avoid redundant builds.
-4. `NEXT_VER_CODE` increments release tags automatically; releases are named `Release` with the changelog notes.
-5. "Auto-release on patch updates" is a feature, not an accident: don't rewire triggers; the user wants daily auto-builds.
+1. `ci.yml` wakes (cron 16:00 UTC, or `workflow_dispatch`) → checks out `build.md` **and `build-state.txt`** from `origin/update` → runs `bash ./build.sh config.toml --config-update`.
+2. `build-state.txt` is the per-app memory, one line per app: `<table>|<patches-src>|<patches-asset>|<configured-version>`. An app is built only when its patch bundle version, patch source, or configured `version` changed — or when it has no line yet. Fresh repos (no state file) fall back to `build.md`, and unchanged apps are seeded into the state file.
+3. `build.yml` runs for the selected apps only (`config.json`), builds, and publishes a new numbered release. Manual "Run workflow" uses the same change detection: if nothing changed, nothing builds. The **force_all** manual input rebuilds everything (and therefore may re-publish unchanged apps).
+4. Builds append their source to `temp/built-state.txt`; the update-branch step merges it (plus seeded lines) into `build-state.txt`, replacing only the apps built in that run, then commits `build.md` + `build-state.txt` to the `update` branch.
+5. `NEXT_VER_CODE` increments release tags automatically; releases are named `Release` with the changelog notes.
+6. "Auto-release on patch updates" is a feature, not an accident: don't rewire triggers; the user wants daily auto-builds.
+
+> **Do not hand-edit `build-state.txt`** on the `update` branch — CI owns it. To force a rebuild, use the force_all manual input; to reset history deliberately, delete the file and the next run re-seeds it.
 
 ## Currently in scope
 

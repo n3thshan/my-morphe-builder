@@ -6,7 +6,7 @@ parallel-jobs = 1
 
 [Notesnook]
 app-name = "Notesnook"
-enabled = true # TEMPORARY: Google Photos-only manual run; set back to true afterwards
+enabled = false # TEMPORARY: Google Photos-only manual run; set back to true afterwards
 build-mode = "apk" # 'both', 'apk' or 'module'
 patches-source = "hxreborn/morphe-patches"
 patches-version = "latest"
