@@ -1,0 +1,13 @@
+# Enforce LF line endings for text files so the Linux CI can run the scripts
+* text=auto eol=lf
+
+# Binary files: never normalize line endings
+bin/** binary
+*.jar binary
+*.keystore binary
+*.p12 binary
+*.apk binary
+*.apkm binary
+*.xapk binary
+*.mpp binary
+*.zip binary
