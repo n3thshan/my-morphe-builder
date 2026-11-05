@@ -1,5 +1,5 @@
 # my-morphe-builder - builds patched APKs with Morphe patches
-# see https://github.com/hxreborn/morphe-patches, https://github.com/Akash-Sriram/morphe-google-photos, https://github.com/heval99/Heval-Morphe-Patches, https://github.com/SysAdminDoc/Hushfacebook and https://github.com/SysAdminDoc/HushPinterest
+# see https://github.com/hxreborn/morphe-patches, https://github.com/Akash-Sriram/morphe-google-photos, https://github.com/heval99/Heval-Morphe-Patches and https://github.com/SysAdminDoc/HushPinterest
 # see CONFIG.md for the full list of options
 enable-module-update = false # release-only flow, no Magisk module update manifests
 parallel-jobs = 1
@@ -52,25 +52,6 @@ cli-version = "latest"
 version = "auto"
 arch = "arm64-v8a"
 apkpure-dlurl = "com.truecaller"
-
-[Facebook]
-app-name = "Facebook"
-build-mode = "apk"
-patches-source = "SysAdminDoc/Hushfacebook"
-patches-version = "latest"
-cli-source = "MorpheApp/morphe-cli"
-cli-version = "latest"
-# Hushfacebook targets 585.0.0.47.54 only; 'auto' resolves to it. APKPure serves
-# that version as an XAPK (129.2 MB, Oct 29 2026); APKEditor merges it into a
-# single APK before patching. The patches keep the package name com.facebook.katana.
-# Note: the builder auto-includes Hushfacebook's 'GmsCore support' patch for apk
-# builds (same as Google Photos) - the patched app routes Google services to
-# MicroG-RE, not Google Play services.
-# Upstream's tested install path is Morphe Manager with the APKMirror .apkm
-# (arm64-v8a, build 476015655); this CI build uses APKPure instead, per choice.
-version = "auto"
-arch = "arm64-v8a"
-apkpure-dlurl = "com.facebook.katana"
 
 [Pinterest]
 app-name = "Pinterest"
