@@ -4,7 +4,7 @@ Guidance for AI agents working in this repository. Read this before making any c
 
 ## What this is
 
-**my-morphe-builder** — a personal, private fork of [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module). It builds patched **Notesnook** and **Google Photos** APKs in the cloud with [GitHub Actions](.github/workflows/), using [hxreborn/morphe-patches](https://github.com/hxreborn/morphe-patches) (Notesnook) and [Akash-Sriram/morphe-google-photos](https://github.com/Akash-Sriram/morphe-google-photos) (Google Photos, derived from De-Vanced) with the [Morphe](https://morphe.software) CLI.
+**my-morphe-builder** — a personal, private fork of [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module). It builds patched **Notesnook**, **Google Photos** and **Truecaller** APKs in the cloud with [GitHub Actions](.github/workflows/), using [hxreborn/morphe-patches](https://github.com/hxreborn/morphe-patches) (Notesnook), [Akash-Sriram/morphe-google-photos](https://github.com/Akash-Sriram/morphe-google-photos) (Google Photos, derived from De-Vanced) and [heval99/Heval-Morphe-Patches](https://github.com/heval99/Heval-Morphe-Patches) (Truecaller) with the [Morphe](https://morphe.software) CLI.
 
 The flow: `ci.yml` (daily cron + manual dispatch) → checks whether the newest patch release is newer than what was last built (`--config-update` against `build.md` on the `update` branch) → if so, `build.yml` runs: downloads the stock APK, patches it, signs it, uploads it to a GitHub Release. **Release-only flow** — no Magisk module, no in-app update-check patch, no Telegram notifications.
 
@@ -12,8 +12,8 @@ The flow: `ci.yml` (daily cron + manual dispatch) → checks whether the newest 
 
 1. **arm64-v8a only.** Never introduce other ABIs (no armeabi-v7a, x86, x86_64, multi-ABI builds) without explicit approval. The Notesnook `arch` is `arm64-v8a` and `utils.sh` refuses bundles without arm64-v8a native libs (`arm64_ok()`).
 2. **Bundled `ks.keystore` signs everything.** Do not add per-app key management or secret handling. Patched APKs can't update over official/Play installs; that's accepted.
-3. **apkeep/APKPure path stays functional and is the Google Photos source.** Don't delete the `apkpure` download source, the apkeep workflow step, or the `arm64_ok` guard. Keep `apkeep -d apk-pure` as apkeep's only download source. Notesnook keeps the official Notesnook endpoint.
-4. **Don't bump app `version`s without checking patch support first.** Patches target specific versions - verify the change against the bundle's `patches-list.json` (hxreborn's for Notesnook; Akash-Sriram/morphe-google-photos' for Google Photos, officially `7.99.0.1007655401` only). Google Photos is deliberately pinned to `7.99.0.1012983279` (force-patched with `-f`, patches best-effort); don't change pins blindly - it breaks the build or ships half-patched APKs.
+3. **apkeep/APKPure path stays functional and is the Google Photos and Truecaller source.** Don't delete the `apkpure` download source, the apkeep workflow step, or the `arm64_ok` guard. Keep `apkeep -d apk-pure` as apkeep's only download source. Notesnook keeps the official Notesnook endpoint.
+4. **Don't bump app `version`s without checking patch support first.** Patches target specific versions - verify the change against the bundle's `patches-list.json` (hxreborn's for Notesnook; Akash-Sriram/morphe-google-photos' for Google Photos, officially `7.99.0.1007655401` only; heval99/Heval-Morphe-Patches' for Truecaller, currently `26.43.5` only). Google Photos is deliberately pinned to `7.99.0.1012983279` (force-patched with `-f`, patches best-effort); don't change pins blindly - it breaks the build or ships half-patched APKs.
 5. **Agent edits files; the user pushes.** No committing/pushing unless the user explicitly asks. No `git remote` operations, no `gh` calls (there is no `gh` here).
 6. **Patches-version policy:** `patches-version = "latest"` is intentional. Don't pin it.
 7. **No scraped/unofficial APK sources** without the user's say-so. Allowed sources are only what's already in `config.toml`/`utils.sh` (`official-dlurl`, `apkpure-dlurl`, `direct-dlurl`, `archive-dlurl`, `apkmirror-dlurl`).
@@ -24,7 +24,7 @@ The flow: `ci.yml` (daily cron + manual dispatch) → checks whether the newest 
 |---|---|
 | `build.sh` | Entry point: parses config, fetches patch/CLI prebuilts, downloads stock APKs, patches, signs, outputs to `build/` |
 | `utils.sh` | All logic: download sources, `get_prebuilts`, `get_patch_last_supported_ver`, APKEditor merge for split bundles, signing, release-changelog assembly |
-| `config.toml` | App tables (`[Notesnook]`, `[GooglePhotos]`); see `CONFIG.md` |
+| `config.toml` | App tables (`[Notesnook]`, `[GooglePhotos]`, `[Truecaller]`); see `CONFIG.md` |
 | `sig.txt` | Allowlist of stock-APK SHA-256 certs; Notesnook is intentionally absent (check is a no-op) |
 | `.github/workflows/build.yml` | Build + release flow (Java 21, apkeep fetch, APK merge/patch, `gh release` upload, `update` branch bookkeeping) |
 | `.github/workflows/ci.yml` | Daily cron 16:00 UTC + `workflow_dispatch`; decides *whether* to build; then calls `build.yml` |
@@ -58,6 +58,7 @@ The flow: `ci.yml` (daily cron + manual dispatch) → checks whether the newest 
   - Notesnook on APKPure: 3.4.12/3.4.13/3.4.15 are armeabi-v7a-only — do not switch to it without pinning `version = "3.4.14"` and knowing why.
   - `version = "auto"` is deliberate: highest version supported by the patches. If the official endpoint serves a newer release than the patches support, the patch step fails loudly — expected; wait for a patch update or pin `version`.
 - **Google Photos** - built from APKPure via apkeep (`-d apk-pure` only). Version manually pinned to `7.99.0.1012983279`; APKPure serves it as an XAPK with an arm64-v8a-only native split (no v7a/x86), which APKEditor merges into a single APK before patching. MGP v1.17.10 officially targets `7.99.0.1007655401` only, so this build is force-patched (`-f`) and patches are best-effort - check the CI log and the resulting APK before relying on it. The MGP patches rename the package to `app.morphe.android.apps.photos` (GmsCore support, default on) - do not `pkg-name` that; the patches declare `com.google.android.apps.photos` as the input package. When bumping, check MGP's patches-list.json and APKPure availability, then update the pin deliberately.
+- **Truecaller** - built from APKPure via apkeep (`-d apk-pure` only) with [heval99/Heval-Morphe-Patches](https://github.com/heval99/Heval-Morphe-Patches). `version = "auto"`: the Truecaller patches target `26.43.5` only, and APKPure serves that version as an XAPK (95.1 MB, listed 2026-11-03) with an arm64-v8a split, which APKEditor merges into a single APK before patching. The patches keep the package name `com.truecaller` (no rename). `auto` follows patch releases - if a future patch release targets a version APKPure doesn't mirror yet, the build fails loudly (expected); wait for APKPure or pin `version`. Check heval99's patches-list.json before any manual version work.
 
 ## Pitfalls (learn from history)
 
@@ -77,8 +78,8 @@ The flow: `ci.yml` (daily cron + manual dispatch) → checks whether the newest 
 
 ## Roadmap (as told by the user)
 
-- **Google Photos** was added as the second app (from `Akash-Sriram/morphe-google-photos`). More selected apps may be added — chosen apps will be provided later; structure configs to allow it.
-- The apkeep path is now used by Google Photos (Google Photos has no official arm64 direct-download endpoint); Notesnook keeps the official endpoint.
+- **Google Photos** was added as the second app (from `Akash-Sriram/morphe-google-photos`); **Truecaller** was added as the third (from `heval99/Heval-Morphe-Patches`). More selected apps may be added - chosen apps will be provided later; structure configs to allow it.
+- The apkeep path is now used by Google Photos and Truecaller (neither has an official arm64 direct-download endpoint); Notesnook keeps the official endpoint.
 - Upstream syncs are periodic but deliberate — agents propose, the user merges.
 - Personal, private project; no template ambitions for now — don't add template scaffolding or public-facing polish.
 

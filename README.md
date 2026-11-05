@@ -1,8 +1,8 @@
 # my-morphe-builder
 
-Fork of [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module) customized to build **Notesnook** and **Google Photos** APKs patched with [hxreborn/morphe-patches](https://github.com/hxreborn/morphe-patches) (Notesnook) and [Akash-Sriram/morphe-google-photos](https://github.com/Akash-Sriram/morphe-google-photos) (Google Photos) using [Morphe](https://morphe.software).
+Fork of [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module) customized to build **Notesnook**, **Google Photos** and **Truecaller** APKs patched with [hxreborn/morphe-patches](https://github.com/hxreborn/morphe-patches) (Notesnook), [Akash-Sriram/morphe-google-photos](https://github.com/Akash-Sriram/morphe-google-photos) (Google Photos) and [heval99/Heval-Morphe-Patches](https://github.com/heval99/Heval-Morphe-Patches) (Truecaller) using [Morphe](https://morphe.software).
 
-Stock APKs come from the **official Notesnook endpoint** (`notesnook.com/api/v1/releases/android/latest/arm64-v8a`) and from **APKPure via [apkeep](https://github.com/EFForg/apkeep)** for Google Photos. The GitHub Actions workflows build everything in the cloud  -  see [`config.toml`](./config.toml), [`CONFIG.md`](./CONFIG.md) and `.github/workflows/`.
+Stock APKs come from the **official Notesnook endpoint** (`notesnook.com/api/v1/releases/android/latest/arm64-v8a`) and from **APKPure via [apkeep](https://github.com/EFForg/apkeep)** for Google Photos and Truecaller. The GitHub Actions workflows build everything in the cloud  -  see [`config.toml`](./config.toml), [`CONFIG.md`](./CONFIG.md) and `.github/workflows/`.
 
 ## What it does
 
@@ -10,14 +10,15 @@ Stock APKs come from the **official Notesnook endpoint** (`notesnook.com/api/v1/
 * If so, it builds and attaches the patched APKs to a GitHub Release:
   * **Notesnook**  -  the **official arm64-v8a APK** from `notesnook.com/api/v1/releases/android/latest/arm64-v8a` (a 302 redirect to the official GitHub release asset) via `official-dlurl`. **Note**: the official endpoint always serves the newest release; if Notesnook ships a version newer than the patches support, the build fails loudly at the patch step (expected  -  wait for a patches update or pin `version` in [`config.toml`](./config.toml)).
   * **Google Photos**  -  via [apkeep](https://github.com/EFForg/apkeep) from APKPure (`-d apk-pure` only, pinned to the latest apkeep release in the workflow). Version pinned to `7.99.0.1012983279`, which APKPure serves as an XAPK with an arm64-v8a-only native split; APKEditor merges it into a single APK before patching. **Note**: MGP v1.17.10 officially targets `7.99.0.1007655401` only - this newer build is force-patched (`-f`), so patches are best-effort. Bump the pin deliberately, after checking MGP's `patches-list.json`.
-* **arm64-v8a only.** The project does not support other ABIs. Notesnook's official build is already arm64-v8a-only; Google Photos arrives from APKPure as a split XAPK whose native libraries are arm64-v8a-only, and APKEditor merges it into a single APK before patching.
-* **APKPure warning**: the Google Photos build downloads its stock APK from APKPure. [apkeep's docs note APKPure is a third-party APK mirror](https://github.com/EFForg/apkeep/blob/master/USAGE-apkpure.md) which has been caught distributing modified apps, so only use it if you accept that risk.
+  * **Truecaller**  -  via [apkeep](https://github.com/EFForg/apkeep) from APKPure (`-d apk-pure` only). `version = "auto"`, so it follows heval99's patches (they target `26.43.5` today, which APKPure serves as an XAPK with an arm64-v8a split); APKEditor merges it into a single APK before patching. If a future patch release targets a version APKPure doesn't serve yet, the build fails loudly - expected; wait for APKPure or pin `version`. The patches keep the package name `com.truecaller`.
+* **arm64-v8a only.** The project does not support other ABIs. Notesnook's official build is already arm64-v8a-only; Google Photos and Truecaller arrive from APKPure as XAPKs with arm64-v8a-only native splits, and APKEditor merges them into single APKs before patching.
+* **APKPure warning**: the Google Photos and Truecaller builds download their stock APKs from APKPure. [apkeep's docs note APKPure is a third-party APK mirror](https://github.com/EFForg/apkeep/blob/master/USAGE-apkpure.md) which has been caught distributing modified apps, so only use it if you accept that risk.
 
 ## Obtainium
 
 [![Get it on Obtainium](https://wispydocs.pages.dev/images/badge_obtainium.png)](./obtainium-import.json)
 
-Import [`obtainium-import.json`](./obtainium-import.json) via Obtainium's **Import/Export -> Import from file**. It adds both **Notesnook** (`com.streetwriters.notesnook`) and **Google Photos** (`app.morphe.android.apps.photos`), tracks the GitHub Releases created by this project's CI with per-app asset filters (`notesnook` / `google-photos`), and has `settings: null` so your Obtainium preferences are untouched.
+Import [`obtainium-import.json`](./obtainium-import.json) via Obtainium's **Import/Export -> Import from file**. It adds **Notesnook** (`com.streetwriters.notesnook`), **Google Photos** (`app.morphe.android.apps.photos`) and **Truecaller** (`com.truecaller`), tracks the GitHub Releases created by this project's CI with per-app asset filters (`notesnook` / `google-photos` / `truecaller`), and has `settings: null` so your Obtainium preferences are untouched.
 
 ## Adding more apps later
 

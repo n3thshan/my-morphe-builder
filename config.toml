@@ -1,5 +1,5 @@
 # my-morphe-builder - builds patched APKs with Morphe patches
-# see https://github.com/hxreborn/morphe-patches and https://github.com/Akash-Sriram/morphe-google-photos
+# see https://github.com/hxreborn/morphe-patches, https://github.com/Akash-Sriram/morphe-google-photos and https://github.com/heval99/Heval-Morphe-Patches
 # see CONFIG.md for the full list of options
 enable-module-update = false # release-only flow, no Magisk module update manifests
 parallel-jobs = 1
@@ -37,3 +37,18 @@ version = "7.99.0.1012983279"
 # APKEditor merges it into a single APK before patching.
 arch = "arm64-v8a"
 apkpure-dlurl = "com.google.android.apps.photos"
+
+[Truecaller]
+app-name = "Truecaller"
+build-mode = "apk"
+patches-source = "heval99/Heval-Morphe-Patches"
+patches-version = "latest"
+cli-source = "MorpheApp/morphe-cli"
+cli-version = "latest"
+# heval99's Truecaller patches target 26.43.5 only; 'auto' resolves to the
+# highest version the patches support. APKPure serves it as an XAPK with an
+# arm64-v8a split; APKEditor merges it into a single APK before patching.
+# The patches keep the package name com.truecaller (no rename).
+version = "auto"
+arch = "arm64-v8a"
+apkpure-dlurl = "com.truecaller"
