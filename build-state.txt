@@ -1,4 +1,4 @@
 GooglePhotos|Akash-Sriram/morphe-google-photos|patches-1.17.10.mpp|7.99.0.1012983279
-Notesnook|hxreborn/morphe-patches|patches-1.71.0.mpp|auto
+Notesnook|hxreborn/morphe-patches|patches-1.72.0.mpp|auto
 Pinterest|SysAdminDoc/HushPinterest|patches-0.0.5.mpp|14.25.0
 Truecaller|heval99/Heval-Morphe-Patches|patches-2.2.0.mpp|auto
