@@ -24,7 +24,7 @@ The flow: `ci.yml` (daily cron + manual dispatch) → checks whether the newest 
 |---|---|
 | `build.sh` | Entry point: parses config, fetches patch/CLI prebuilts, downloads stock APKs, patches, signs, outputs to `build/` |
 | `utils.sh` | All logic: download sources, `get_prebuilts`, `get_patch_last_supported_ver`, APKEditor merge for split bundles, signing, release-changelog assembly |
-| `config.toml` | App tables (currently only `[Notesnook]`); see `CONFIG.md` |
+| `config.toml` | App tables (`[Notesnook]`, `[GooglePhotos]`); see `CONFIG.md` |
 | `sig.txt` | Allowlist of stock-APK SHA-256 certs; Notesnook is intentionally absent (check is a no-op) |
 | `.github/workflows/build.yml` | Build + release flow (Java 21, apkeep fetch, APK merge/patch, `gh release` upload, `update` branch bookkeeping) |
 | `.github/workflows/ci.yml` | Daily cron 16:00 UTC + `workflow_dispatch`; decides *whether* to build; then calls `build.yml` |
@@ -66,6 +66,7 @@ The flow: `ci.yml` (daily cron + manual dispatch) → checks whether the newest 
 - **hxreborn patch bundles (`.mpp`)** ship `extensions/extension.mpe` and **no** `extensions/shared.*`; the paccer "remove integrations checks" step must skip silently — don't "fix" it to fail on missing files.
 - **sig.txt** doesn't include Notesnook; `check_sig` passes through. Don't add entries unless you actually trust stock signatures from that source.
 - **APKPure is a third-party mirror** with known malware-distribution history; it's here only for the user's later testing, not for default production use.
+- **cmpr helpers are lazy:** `build.sh` downloads the module template's `cmpr` binaries only when at least one *enabled* app builds a module (`build-mode = "module"` or `"both"`). APK-only runs (the norm here) skip them — that's intentional, don't "restore" the unconditional download.
 
 ## Common tasks
 
