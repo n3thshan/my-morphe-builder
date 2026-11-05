@@ -119,6 +119,10 @@ get_prebuilts() {
 				matches_new=$(jq -e -r 'map(select(.name | contains("-dev") | not))' <<<"$matches")
 				if [ "$(jq 'length' <<<"$matches_new")" -eq 1 ]; then
 					matches=$matches_new
+				elif matches_mpp=$(jq -e -r 'map(select(.name | endswith(".mpp"))) | select(length >= 1)' <<<"$matches_new"); then
+					# some patch releases ship extra files (e.g. SHA256SUMS.txt) next to the
+					# bundle - always prefer the .mpp when more than one candidate remains
+					matches=$matches_mpp
 				fi
 			fi
 			if [ "$(jq 'length' <<<"$matches")" -eq 0 ]; then

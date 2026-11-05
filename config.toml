@@ -1,5 +1,5 @@
 # my-morphe-builder - builds patched APKs with Morphe patches
-# see https://github.com/hxreborn/morphe-patches, https://github.com/Akash-Sriram/morphe-google-photos and https://github.com/heval99/Heval-Morphe-Patches
+# see https://github.com/hxreborn/morphe-patches, https://github.com/Akash-Sriram/morphe-google-photos, https://github.com/heval99/Heval-Morphe-Patches, https://github.com/SysAdminDoc/Hushfacebook and https://github.com/SysAdminDoc/HushPinterest
 # see CONFIG.md for the full list of options
 enable-module-update = false # release-only flow, no Magisk module update manifests
 parallel-jobs = 1
@@ -52,3 +52,45 @@ cli-version = "latest"
 version = "auto"
 arch = "arm64-v8a"
 apkpure-dlurl = "com.truecaller"
+
+[Facebook]
+app-name = "Facebook"
+build-mode = "apk"
+patches-source = "SysAdminDoc/Hushfacebook"
+patches-version = "latest"
+cli-source = "MorpheApp/morphe-cli"
+cli-version = "latest"
+# Hushfacebook targets 585.0.0.47.54 only; 'auto' resolves to it. APKPure serves
+# that version as an XAPK (129.2 MB, Oct 29 2026); APKEditor merges it into a
+# single APK before patching. The patches keep the package name com.facebook.katana.
+# Note: the builder auto-includes Hushfacebook's 'GmsCore support' patch for apk
+# builds (same as Google Photos) - the patched app routes Google services to
+# MicroG-RE, not Google Play services.
+# Upstream's tested install path is Morphe Manager with the APKMirror .apkm
+# (arm64-v8a, build 476015655); this CI build uses APKPure instead, per choice.
+version = "auto"
+arch = "arm64-v8a"
+apkpure-dlurl = "com.facebook.katana"
+
+[Pinterest]
+app-name = "Pinterest"
+build-mode = "apk"
+# pinned by the user: newer HushPinterest releases target Pinterest versions
+# APKPure doesn't mirror (APKPure's newest is 14.25.0). v0.0.5 targets
+# 14.25.0 and 14.38.0, both official. 14.25.0 is on APKPure.
+patches-source = "SysAdminDoc/HushPinterest"
+patches-version = "v0.0.5"
+cli-source = "MorpheApp/morphe-cli"
+cli-version = "latest"
+# 'auto' would resolve to 14.38.0 here - which APKPure doesn't have - so the
+# version is pinned to 14.25.0 (official target of v0.0.5; pin passes -f,
+# harmless, the patches match this exact build). APKPure serves it as an
+# XAPK; APKEditor merges it into a single APK before patching.
+# v0.0.5 has 23 patches and NO 'GmsCore support' / 'Fix push notifications'
+# patches (those came later), so Google services are untouched - sign in with
+# email + password; Google sign-in can't work on a re-signed app anyway.
+# Bump to a newer HushPinterest (and version) once APKPure mirrors a build a
+# newer release supports.
+version = "14.25.0"
+arch = "arm64-v8a"
+apkpure-dlurl = "com.pinterest"
