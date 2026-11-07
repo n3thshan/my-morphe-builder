@@ -1,5 +1,5 @@
 # my-morphe-builder - builds patched APKs with Morphe patches
-# see https://github.com/hxreborn/morphe-patches, https://github.com/Akash-Sriram/morphe-google-photos, https://github.com/heval99/Heval-Morphe-Patches and https://github.com/SysAdminDoc/HushPinterest
+# see https://github.com/hxreborn/morphe-patches, https://github.com/heval99/Heval-Morphe-Patches and https://github.com/SysAdminDoc/HushPinterest
 # see CONFIG.md for the full list of options
 enable-module-update = false # release-only flow, no Magisk module update manifests
 parallel-jobs = 1
@@ -21,22 +21,6 @@ official-dlurl = "https://notesnook.com/api/v1/releases/android/latest/arm64-v8a
 # alternative: apkeep from APKPure (kept for later testing). WARNING: there the
 # 3.4.12/3.4.13/3.4.15 XAPKs are armeabi-v7a-only, so also pin version = "3.4.14".
 # apkpure-dlurl = "com.streetwriters.notesnook"
-
-[GooglePhotos]
-app-name = "Google Photos"
-build-mode = "apk"
-patches-source = "Akash-Sriram/morphe-google-photos"
-patches-version = "latest"
-cli-source = "MorpheApp/morphe-cli"
-cli-version = "latest"
-# manually pinned. MGP v1.17.10 officially targets 7.99.0.1007655401 only; this
-# newer build is force-patched (-f) and patches are best-effort. Check their
-# patches-list.json before bumping, and bump only after verifying the build.
-version = "7.99.0.1012983279"
-# APKPure serves this version as an XAPK with an arm64-v8a split (no other ABIs);
-# APKEditor merges it into a single APK before patching.
-arch = "arm64-v8a"
-apkpure-dlurl = "com.google.android.apps.photos"
 
 [Truecaller]
 app-name = "Truecaller"
