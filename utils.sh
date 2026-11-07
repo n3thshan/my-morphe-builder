@@ -110,33 +110,43 @@ get_prebuilts() {
 			file=$(grep "/[^/]*${ver#v}[^/]*\$" <<<"$file" | head -1)
 		fi
 		if [ -z "$file" ]; then
-			local resp asset name
+			local resp asset name digest
 			resp=$(gh_req "$rv_rel" -) || return 1
-			tag_name=$(jq -r '.tag_name' <<<"$resp") || return 1
-			matches=$(jq -e '.assets | map(select(.name | (endswith("asc") or endswith("json")) | not))' <<<"$resp") || return 1
-			if [ "$(jq 'length' <<<"$matches")" -gt 1 ]; then
-				local matches_new
-				matches_new=$(jq -e -r 'map(select(.name | contains("-dev") | not))' <<<"$matches")
-				if [ "$(jq 'length' <<<"$matches_new")" -eq 1 ]; then
-					matches=$matches_new
-				elif matches_mpp=$(jq -e -r 'map(select(.name | endswith(".mpp"))) | select(length >= 1)' <<<"$matches_new"); then
-					# some patch releases ship extra files (e.g. SHA256SUMS.txt) next to the
-					# bundle - always prefer the .mpp when more than one candidate remains
-					matches=$matches_mpp
-				fi
-			fi
-			if [ "$(jq 'length' <<<"$matches")" -eq 0 ]; then
-				epr "No asset was found"
-				return 1
-			elif [ "$(jq 'length' <<<"$matches")" -ne 1 ]; then
-				wpr "More than 1 asset was found for this release. Falling back to the first one found..."
-			fi
-			asset=$(jq -r ".[0]" <<<"$matches")
-			url=$(jq -r .url <<<"$asset")
-			name=$(jq -r .name <<<"$asset")
+			tag_name=$(jq -r '.tag_name // empty' <<<"$resp" 2>/dev/null) || return 1
 			if [ "$tag" = "Patches" ]; then
-				local name_ext="${name##*.}"
-				name="patches-${tag_name#v}.${name_ext}"
+				local picked
+				if ! picked=$(pick_patch_bundle <<<"$resp") || [ -z "$picked" ]; then
+					epr "No asset was found"
+					return 1
+				fi
+				IFS=$'\t' read -r _ name digest <<<"$picked"
+				url=$(jq -r --arg n "$name" '(.assets // [])[] | select(.name == $n) | .url' <<<"$resp" | head -1) || return 1
+				if [ -z "$url" ]; then
+					epr "No asset was found"
+					return 1
+				fi
+			else
+				matches=$(jq -e '.assets | map(select(.name | (endswith("asc") or endswith("json")) | not))' <<<"$resp") || return 1
+				if [ "$(jq 'length' <<<"$matches")" -gt 1 ]; then
+					local matches_new
+					matches_new=$(jq -e -r 'map(select(.name | contains("-dev") | not))' <<<"$matches")
+					if [ "$(jq 'length' <<<"$matches_new")" -eq 1 ]; then
+						matches=$matches_new
+					elif matches_mpp=$(jq -e -r 'map(select(.name | endswith(".mpp"))) | select(length >= 1)' <<<"$matches_new"); then
+						# some patch releases ship extra files (e.g. SHA256SUMS.txt) next to the
+						# bundle - always prefer the .mpp when more than one candidate remains
+						matches=$matches_mpp
+					fi
+				fi
+				if [ "$(jq 'length' <<<"$matches")" -eq 0 ]; then
+					epr "No asset was found"
+					return 1
+				elif [ "$(jq 'length' <<<"$matches")" -ne 1 ]; then
+					wpr "More than 1 asset was found for this release. Falling back to the first one found..."
+				fi
+				asset=$(jq -r ".[0]" <<<"$matches")
+				url=$(jq -r .url <<<"$asset")
+				name=$(jq -r .name <<<"$asset")
 			fi
 
 			file="${dir}/${name}"
@@ -196,13 +206,55 @@ set_prebuilts() {
 	TOML="${BIN_DIR}/toml/tq-${arch}"
 }
 
+pick_patch_bundle() {
+	# reads a GitHub release JSON on stdin; prints exactly one line:
+	# "<tag_name>\t<asset_name>\t<digest>" where <digest> is the asset's native
+	# digest field ("sha256:..."), or "-" when null/absent. Prints nothing and
+	# returns 1 when no patch bundle asset is present in the release.
+	local resp tag_name
+	resp=$(cat)
+	tag_name=$(jq -r '.tag_name // empty' <<<"$resp" 2>/dev/null) || return 1
+	if [ -z "$tag_name" ]; then return 1; fi
+	local candidates
+	candidates=$(jq -c '[(.assets // [])[] | select(.name | test("\\.(asc|json|txt|md|yml|yaml|sig)$"; "i") | not)]' <<<"$resp") || return 1
+	# prefer .mpp candidates when any exist
+	local mpp
+	mpp=$(jq -c '[.[] | select(.name | endswith(".mpp"))]' <<<"$candidates") || return 1
+	if [ "$(jq 'length' <<<"$mpp")" -gt 0 ]; then
+		candidates="$mpp"
+	fi
+	local count
+	count=$(jq 'length' <<<"$candidates") || return 1
+	if [ "$count" -eq 0 ]; then return 1; fi
+	local name
+	if [ "$count" -gt 1 ]; then
+		# pick the candidate whose filename contains the highest dot-separated
+		# numeric version (e.g. patches-2.2.0.mpp beats patches-2.1.0.mpp)
+		name=$(jq -r '[ .[] | .name as $n | ((($n | capture("(?<v>[0-9]+(\\.[0-9]+)*)"))? // {v: "0"}).v | split(".") | map(tonumber)) as $ver | {name: $n, ver: $ver} ] | sort_by(.ver) | .[-1].name' <<<"$candidates") || return 1
+	else
+		name=$(jq -r '.[0].name' <<<"$candidates") || return 1
+	fi
+	if [ -z "$name" ]; then return 1; fi
+	local digest
+	digest=$(jq -r --arg n "$name" '(.assets // [])[] | select(.name == $n) | (.digest // "-")' <<<"$resp" | head -1) || digest="-"
+	if [ -z "$digest" ] || [ "$digest" = "null" ]; then digest="-"; fi
+	# prefix bare 64-char hex digests with sha256:; leave anything else as-is
+	if [[ "$digest" =~ ^[0-9a-fA-F]{64}$ ]]; then digest="sha256:${digest}"; fi
+	printf '%s\t%s\t%s\n' "$tag_name" "$name" "$digest"
+}
+
 config_update() {
 	if [ ! -f build.md ]; then abort "build.md not available"; fi
 	: >"$TEMP_DIR"/skipped
+	: >"$TEMP_DIR"/rebuilt
+	: >"$TEMP_DIR"/could-not-check
 	: >"$TEMP_DIR"/seed-state.txt
 	local upped=()
 	local prcfg=false
-	# per-app build state from the update branch: <table>|<patches-src>|<patches-asset>|<configured-version>
+	local considered=0 failed=0
+	# per-app build state from the update branch.
+	# new format:    <table>|<patches-src>|<tag>|<asset>|<digest>|<configured-version>
+	# legacy format: <table>|<patches-src>|<asset>|<configured-version>
 	local state_file="build-state.txt"
 	[ -f "$state_file" ] || state_file=""
 	declare -A latest_assets=()
@@ -214,49 +266,105 @@ config_update() {
 		PATCHES_SRC=$(toml_get "$t" patches-source) || PATCHES_SRC=$DEF_PATCHES_SRC
 		PATCHES_VER=$(toml_get "$t" patches-version) || PATCHES_VER=$DEF_PATCHES_VER
 		CFG_VER=$(toml_get "$t" version) || CFG_VER="auto"
+		PATCHES_SRC="${PATCHES_SRC#"${PATCHES_SRC%%[![:space:]]*}"}"
+		PATCHES_SRC="${PATCHES_SRC%"${PATCHES_SRC##*[![:space:]]}"}"
+		PATCHES_VER="${PATCHES_VER#"${PATCHES_VER%%[![:space:]]*}"}"
+		PATCHES_VER="${PATCHES_VER%"${PATCHES_VER##*[![:space:]]}"}"
+		CFG_VER="${CFG_VER#"${CFG_VER%%[![:space:]]*}"}"
+		CFG_VER="${CFG_VER%"${CFG_VER##*[![:space:]]}"}"
+		considered=$((considered + 1))
 
-		local src_key="${PATCHES_SRC}/${PATCHES_VER}" last_patches="" resp
+		local src_key="${PATCHES_SRC}/${PATCHES_VER}" picked="" TAG_NAME="" NAME="" DIGEST=""
 		if [ -n "${latest_assets[$src_key]+x}" ]; then
-			last_patches="${latest_assets[$src_key]}"
+			picked="${latest_assets[$src_key]}"
 		else
-			local rv_rel="https://api.github.com/repos/${PATCHES_SRC}/releases"
+			local rv_rel="https://api.github.com/repos/${PATCHES_SRC}/releases" resp="" tag_name=""
 			if [ "$PATCHES_VER" = "dev" ]; then
-				resp=$(gh_req "$rv_rel" -) && last_patches=$(jq -e -r '.[0]' <<<"$resp") || last_patches=""
+				if resp=$(gh_req "$rv_rel" -); then
+					if ! resp=$(jq -e -r '.[0]' <<<"$resp"); then resp=""; fi
+				else
+					resp=""
+				fi
 			elif [ "$PATCHES_VER" = "latest" ]; then
-				last_patches=$(gh_req "$rv_rel/latest" -) || last_patches=""
+				resp=$(gh_req "$rv_rel/latest" -) || resp=""
 			else
-				last_patches=$(gh_req "$rv_rel/tags/${PATCHES_VER}" -) || last_patches=""
+				resp=$(gh_req "$rv_rel/tags/${PATCHES_VER}" -) || resp=""
 			fi
-			if [ -n "$last_patches" ]; then
-				local tag_name
-				tag_name=$(jq -e -r '.tag_name' <<<"$last_patches") || abort "config_update error: No tag name"
-				if ! last_patches=$(jq -e -r '.assets[] | select(.name | (endswith("asc") or endswith("json")) | not) | .name' <<<"$last_patches"); then
-					abort "config_update error: '$last_patches'"
-				fi
-				if [ "$last_patches" ]; then
-					local name_ext="${last_patches##*.}"
-					last_patches="patches-${tag_name#v}.${name_ext}"
-				fi
+			if [ -z "$resp" ]; then
+				echo "${table_name}: GitHub API error" >>"$TEMP_DIR"/could-not-check
+				failed=$((failed + 1))
+				continue
 			fi
-			latest_assets[$src_key]="$last_patches"
+			tag_name=$(jq -r '.tag_name // empty' <<<"$resp" 2>/dev/null) || tag_name=""
+			if [ -z "$tag_name" ]; then
+				echo "${table_name}: GitHub API error" >>"$TEMP_DIR"/could-not-check
+				failed=$((failed + 1))
+				continue
+			fi
+			if ! picked=$(pick_patch_bundle <<<"$resp") || [ -z "$picked" ]; then
+				echo "${table_name}: no patch bundle asset found in release" >>"$TEMP_DIR"/could-not-check
+				failed=$((failed + 1))
+				continue
+			fi
+			latest_assets[$src_key]="$picked"
 		fi
-		if [ -z "$last_patches" ]; then continue; fi
+		IFS=$'\t' read -r TAG_NAME NAME DIGEST <<<"$picked"
+		if [ -z "$NAME" ]; then
+			echo "${table_name}: no patch bundle asset found in release" >>"$TEMP_DIR"/could-not-check
+			failed=$((failed + 1))
+			continue
+		fi
 
-		local state_line="" state_src="" state_asset="" state_ver=""
+		local state_line="" state_src="" state_tag="" state_name="" state_digest="" state_cfgver="" state_nf=0
 		if [ -n "$state_file" ]; then
 			state_line=$(awk -F'|' -v t="$table_name" '$1 == t { print; exit }' "$state_file" 2>/dev/null) || :
-			if [ -n "$state_line" ]; then
-				IFS='|' read -r _ state_src state_asset state_ver <<<"$state_line"
+		fi
+		if [ -n "$state_line" ]; then
+			state_line="${state_line%$'\r'}"
+			local fields=()
+			IFS='|' read -r -a fields <<<"$state_line"
+			local i f
+			for i in "${!fields[@]}"; do
+				f="${fields[$i]}"
+				f="${f#"${f%%[![:space:]]*}"}"
+				f="${f%"${f##*[![:space:]]}"}"
+				fields[$i]="$f"
+			done
+			state_nf=${#fields[@]}
+			if [ "$state_nf" -eq 4 ]; then
+				# legacy format: table|src|asset|cfgver
+				state_src="${fields[1]}"
+				state_name="${fields[2]}"
+				state_cfgver="${fields[3]}"
+				state_tag="-"
+				state_digest="-"
+			elif [ "$state_nf" -ge 5 ]; then
+				# new format, tolerate extra fields by taking from the right.
+				# canonical suffix is ...|name|digest|cfgver (as written by
+				# built-state.txt and the seed-state lines below):
+				# table|src|tag|name|digest|cfgver (NF==6), or the same minus
+				# the tag field (NF==5, tag unknown)
+				state_cfgver="${fields[$((state_nf - 1))]}"
+				state_digest="${fields[$((state_nf - 2))]}"
+				state_name="${fields[$((state_nf - 3))]}"
+				if [ "$state_nf" -ge 6 ]; then
+					state_tag="${fields[$((state_nf - 4))]}"
+				else
+					state_tag="-"
+				fi
+				state_src="${fields[1]}"
 			fi
 		fi
 
-		local changed=false reason="" OP="" app_line="" recorded_ver=""
+		local changed=false reason="" app_line="" recorded_ver=""
 		if [ -n "$state_line" ]; then
 			if [ "$state_src" != "$PATCHES_SRC" ]; then
 				changed=true reason="patch source changed"
-			elif [ "$state_asset" != "$last_patches" ]; then
+			elif [ -n "$state_digest" ] && [ "$state_digest" != "-" ] && [ -n "$DIGEST" ] && [ "$DIGEST" != "-" ] && [ "$state_digest" != "$DIGEST" ]; then
 				changed=true reason="patches updated"
-			elif [ "$CFG_VER" != "$state_ver" ]; then
+			elif [ "$state_name" != "$NAME" ]; then
+				changed=true reason="patches updated"
+			elif [ "$CFG_VER" != "$state_cfgver" ]; then
 				changed=true reason="configured version changed"
 			fi
 		elif [ -n "$state_file" ]; then
@@ -264,29 +372,44 @@ config_update() {
 			changed=true reason="no recorded build"
 		else
 			# migration path: no state file yet - fall back to build.md, then seed state below
-			if ! OP=$(grep -m1 "^Patches: ${PATCHES_SRC}/${last_patches}" build.md); then
+			if ! grep -m1 "^Patches: ${PATCHES_SRC}/${NAME}" build.md >/dev/null; then
 				changed=true reason="patches updated"
 			fi
 			app_line=$(grep -m1 -E "^${table_name}( \(|:)" build.md 2>/dev/null) || :
 			if [ -n "$app_line" ]; then recorded_ver="${app_line##*: }"; fi
+			recorded_ver="${recorded_ver%"${recorded_ver##*[![:space:]]}"}"
+			recorded_ver="${recorded_ver#"${recorded_ver%%[![:space:]]*}"}"
 			if [ -z "$recorded_ver" ]; then
 				changed=true reason="no recorded build"
 			elif [ "$CFG_VER" != "auto" ] && [ "$CFG_VER" != "$recorded_ver" ]; then
 				changed=true reason="configured version changed"
 			fi
 			if [ "$changed" = false ]; then
-				printf '%s|%s|%s|%s\n' "$table_name" "$PATCHES_SRC" "$last_patches" "$CFG_VER" >>"$TEMP_DIR"/seed-state.txt
-				echo "${table_name}: ${PATCHES_SRC}/${last_patches} (up to date, recorded)" >>"$TEMP_DIR"/skipped
+				printf '%s|%s|%s|%s|%s|%s\n' "$table_name" "$PATCHES_SRC" "$TAG_NAME" "$NAME" "$DIGEST" "$CFG_VER" >>"$TEMP_DIR"/seed-state.txt
+				echo "${table_name}: up to date, recorded" >>"$TEMP_DIR"/skipped
 				continue
 			fi
+		fi
+
+		if [ "$changed" = false ]; then
+			echo "${table_name}: up to date (${NAME})" >>"$TEMP_DIR"/skipped
+			if [ "$state_nf" -eq 4 ]; then
+				# upgrade legacy state lines to the new format
+				printf '%s|%s|%s|%s|%s|%s\n' "$table_name" "$PATCHES_SRC" "$TAG_NAME" "$NAME" "$DIGEST" "$CFG_VER" >>"$TEMP_DIR"/seed-state.txt
+			fi
+			continue
 		fi
 
 		if [ "$changed" = true ]; then
 			prcfg=true
 			upped+=("$table_name")
-			echo "${table_name}: ${reason}" >>"$TEMP_DIR"/skipped
+			echo "${table_name}: ${reason}" >>"$TEMP_DIR"/rebuilt
 		fi
 	done
+	if [ "$considered" -gt 0 ] && [ "$failed" -eq "$considered" ]; then
+		epr "all enabled apps failed their patch check"
+		exit 1
+	fi
 	if [ "$prcfg" = true ]; then
 		local query=""
 		for table in "${upped[@]}"; do
@@ -1083,7 +1206,10 @@ build_rv() {
 		pr "Built ${table} (root): '${BUILD_DIR}/${module_output}'"
 	done
 	# record what this app was built from (merged into build-state.txt on the update branch)
-	echo "${args[table_key]}|${args[patches_src]}|$(basename "${args[ptjar]}")|${args[version]}" >>"$TEMP_DIR/built-state.txt"
+	digest="sha256:$(sha256sum "${args[ptjar]}" 2>/dev/null | cut -d' ' -f1)" || digest="-"
+	[ -z "$(sha256sum "${args[ptjar]}" 2>/dev/null)" ] && digest="-"
+	[ "$digest" = "sha256:" ] && digest="-"
+	printf '%s|%s|%s|%s|%s|%s\n' "${args[table_key]}" "${args[patches_src]}" "-" "$(basename "${args[ptjar]}")" "$digest" "${args[version]}" >>"$TEMP_DIR/built-state.txt"
 }
 
 list_args() { tr -d '\t\r' <<<"$1" | tr -s ' ' | sed 's/" "/"\n"/g' | sed 's/\([^"]\)"\([^"]\)/\1'\''\2/g' | grep -v '^$' || :; }

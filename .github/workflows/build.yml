@@ -49,26 +49,33 @@ jobs:
         if: ${{ inputs.force_all != true }}
         run: |
           SKIP=false
+          SEED_ONLY=false
           if git checkout origin/update build.md 2>/dev/null; then
             git checkout origin/update build-state.txt 2>/dev/null || :
             UPDATE_CFG=$(bash ./build.sh config.toml --config-update)
             if [ "$UPDATE_CFG" ]; then
               echo "'$UPDATE_CFG'"
               echo "$UPDATE_CFG" > config.json
+            elif [ ! -f build-state.txt ] && [ -s temp/seed-state.txt ]; then
+              echo "No state file yet; freshly seeding build-state.txt only (nothing to build)."
+              SKIP=true
+              SEED_ONLY=true
             elif [ -f build-state.txt ]; then
               echo "Nothing changed since the last build - skipping."
               SKIP=true
             fi
           fi
           echo "SKIP=$SKIP" >> "$GITHUB_OUTPUT"
+          echo "SEED_ONLY=$SEED_ONLY" >> "$GITHUB_OUTPUT"
 
       - name: Get next version code
         id: next_ver_code
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          TAG=$(gh release list -L 1 | awk -F '\t' '{print $3}')
+          TAG=$(gh release list -L 1 --json tagName --jq '(.[0].tagName // "0")')
           if [ -z "$TAG" ]; then TAG=0; fi
+          if ! [[ "$TAG" =~ ^[0-9]+$ ]]; then TAG=0; fi
           echo "NEXT_VER_CODE=$((TAG + 1))" >> $GITHUB_OUTPUT
 
       - name: Build modules/APKs
@@ -97,12 +104,7 @@ jobs:
           BODY: ${{ steps.get_output.outputs.BUILD_LOG }}
         run: |
           ls -lh ./build/*
-          if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release edit "$TAG" --title "Release" --notes "$BODY"
-            gh release upload "$TAG" ./build/* --clobber
-          else
-            gh release create "$TAG" ./build/* --title "Release" --notes "$BODY"
-          fi
+          gh release create "$TAG" ./build/* --title "Release" --notes "$BODY"
 
       - name: Update modules changelog and update json
         id: update_config
@@ -141,18 +143,32 @@ jobs:
           done
           cd ..
 
-          find . -name "*-update.json" | grep . || : >dummy-update.json
-
       - name: Commit module json changes
         if: steps.update_cfg.outputs.SKIP != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
       
-          git add build.md *-update.json build-state.txt
+          git add -f build.md build-state.txt
+          find . -name '*-update.json' -print0 | xargs -0 -r git add
       
           if ! git diff --cached --quiet; then
             git commit -m "Bump version ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}"
+            git push origin HEAD:update
+          else
+            echo "no changes!"
+          fi
+
+      - name: Commit seeded build-state
+        if: steps.update_cfg.outputs.SEED_ONLY == 'true'
+        run: |
+          git checkout -f update || git switch --discard-changes --orphan update
+          cp -f temp/seed-state.txt build-state.txt
+          git add -f build-state.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --cached --quiet; then
+            git commit -m "Seed build-state.txt"
             git push origin HEAD:update
           else
             echo "no changes!"

@@ -181,10 +181,20 @@ log "Use [zygisk-detach](https://github.com/j-hc/zygisk-detach) to detach YouTub
 log "\n[revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module)\n"
 log "$(cat "$TEMP_DIR"/*/changelog.md)"
 
+REBUILT=$(cat "$TEMP_DIR"/rebuilt 2>/dev/null || :)
 SKIPPED=$(cat "$TEMP_DIR"/skipped 2>/dev/null || :)
+UNCHECKED=$(cat "$TEMP_DIR"/could-not-check 2>/dev/null || :)
+if [ -n "$REBUILT" ]; then
+	log "\nRebuilt because:"
+	log "$REBUILT"
+fi
 if [ -n "$SKIPPED" ]; then
-	log "\nSkipped:"
+	log "\nNot built (up to date):"
 	log "$SKIPPED"
+fi
+if [ -n "$UNCHECKED" ]; then
+	log "\nCould not check (GitHub API failed):"
+	log "$UNCHECKED"
 fi
 
 pr "Done"
