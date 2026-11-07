@@ -1,19 +1,22 @@
-Pinterest: 14.25.0  
-Truecaller: 26.43.5  
+GooglePhotos: 7.99.0.1012983279  
+Notesnook: 3.4.15  
 
 Install [Microg](https://github.com/MorpheApp/MicroG-RE/) for non-root YouTube and YT Music APKs  
 Use [zygisk-detach](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music modules from Play Store  
 
 [revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module)
   
-Patches: heval99/Heval-Morphe-Patches/patches-2.2.0.mpp  
-[Changelog](https://github.com/heval99/Heval-Morphe-Patches/releases/tag/v2.2.0)
+Patches: Akash-Sriram/morphe-google-photos/patches-1.17.11.mpp  
+[Changelog](https://github.com/Akash-Sriram/morphe-google-photos/releases/tag/v1.17.11)
 
-Patches: SysAdminDoc/HushPinterest/patches-0.0.5.mpp  
-[Changelog](https://github.com/SysAdminDoc/HushPinterest/releases/tag/v0.0.5)
+CLI: MorpheApp/morphe-cli/morphe-desktop-2.1.1-all.jar  
+Patches: hxreborn/morphe-patches/patches-1.73.0.mpp  
+[Changelog](https://github.com/hxreborn/morphe-patches/releases/tag/v1.73.0)  
 
-CLI: MorpheApp/morphe-cli/morphe-desktop-2.1.1-all.jar    
+Rebuilt because:  
+GooglePhotos: patches updated
+Notesnook: patches updated  
 
-Skipped:  
-Pinterest: patches updated
-Truecaller: patches updated  
+Not built (up to date):  
+Pinterest: up to date (patches-0.0.5.mpp)
+Truecaller: up to date (patches-2.2.0.mpp)  
