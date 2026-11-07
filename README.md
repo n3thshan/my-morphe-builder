@@ -13,7 +13,7 @@ Fork of [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-mo
 
 ## Obtainium
 
-<a href="./obtainium-import.json"><img src="https://wispydocs.pages.dev/images/badge_obtainium.png" alt="Get it on Obtainium" width="140"></a>
+<a href="./obtainium-import.json"><img src="https://wispydocs.pages.dev/images/badge_obtainium.png" alt="Get it on Obtainium" width="280"></a>
 
 1. Click the above 
 2. Download the `.json` file
