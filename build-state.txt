@@ -1,4 +1,4 @@
 GooglePhotos|Akash-Sriram/morphe-google-photos|-|patches-1.17.11.mpp|sha256:19e3c55610f5f98a96f4c662dceb757fcbaf658115fec6f51cc6a0cbbd3dd6e5|7.99.0.1012983279
-Notesnook|hxreborn/morphe-patches|-|patches-1.73.0.mpp|sha256:4e5ef7540c6f811ce0951115af00dfbdb84bc4da47e1d734a218ac3430b63b4b|auto
+Notesnook|hxreborn/morphe-patches|-|patches-1.74.0.mpp|sha256:00e07b87a0de064db387ef2165d06dea635be1078a91f2452c41dfb2174b8206|auto
 Pinterest|SysAdminDoc/HushPinterest|v0.0.5|patches-0.0.5.mpp|sha256:6b612c9d8e6113ea047ecc10f1094549ff26ac2f962dd1dbb81b4f28b9581bfc|14.25.0
 Truecaller|heval99/Heval-Morphe-Patches|v2.2.0|patches-2.2.0.mpp|sha256:045cb087bd36a856e4815222e3e9e5dde847c15d694c8dfc115d2892674748bc|auto

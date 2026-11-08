@@ -1,4 +1,3 @@
-GooglePhotos: 7.99.0.1012983279  
 Notesnook: 3.4.15  
 
 Install [Microg](https://github.com/MorpheApp/MicroG-RE/) for non-root YouTube and YT Music APKs  
@@ -6,15 +5,12 @@ Use [zygisk-detach](https://github.com/j-hc/zygisk-detach) to detach YouTube and
 
 [revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module)
   
-Patches: Akash-Sriram/morphe-google-photos/patches-1.17.11.mpp  
-[Changelog](https://github.com/Akash-Sriram/morphe-google-photos/releases/tag/v1.17.11)
+Patches: hxreborn/morphe-patches/patches-1.74.0.mpp  
+[Changelog](https://github.com/hxreborn/morphe-patches/releases/tag/v1.74.0)
 
-CLI: MorpheApp/morphe-cli/morphe-desktop-2.1.1-all.jar  
-Patches: hxreborn/morphe-patches/patches-1.73.0.mpp  
-[Changelog](https://github.com/hxreborn/morphe-patches/releases/tag/v1.73.0)  
+CLI: MorpheApp/morphe-cli/morphe-desktop-2.1.1-all.jar    
 
 Rebuilt because:  
-GooglePhotos: patches updated
 Notesnook: patches updated  
 
 Not built (up to date):  
