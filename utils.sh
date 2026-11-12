@@ -567,6 +567,109 @@ merge_splits() {
 	return 0
 }
 
+# -------------------- superpack-unpack (HushFacebook Android 9+ stock APK) --------------------
+# Facebook's Android 9+ builds keep almost all of their DEX files in a "Superpack"
+# store that only the app's native library can decode, so the patcher sees almost
+# nothing. This rewrites the merged stock APK into the Android 11+ layout (DEX
+# files in the root) the patcher can read. It drives the upstream unpacker
+# (fetched at build time; see superpack-ref in config.toml for the exact pin) on a connected
+# Android device/emulator whose CPU can load the library; on an x86_64 emulator,
+# a second, x86_64 build of the same version is fetched purely for its
+# libsuperpack-jni.so - the APK being patched stays the arm64-v8a one. The store
+# is decoded on the device and every DEX file is checked against the SHA-1 hashes
+# in the APK's own metadata.txt, so a wrong library can't produce bad output.
+# The result is unsigned; the patcher signs it.
+superpack_unpack() {
+	local stock_apk=$1 pkg_name=$2 version=$3 arch=$4 patches_src=$5 patches_ver=$6 superpack_ref=$7
+	local ref work lib_apk d8 serial="${ANDROID_SERIAL:-}"
+	[ "$arch" = "arm64-v8a" ] || { epr "superpack-unpack: only arm64-v8a is supported"; return 1; }
+	[ -n "$pkg_name" ] || { epr "superpack-unpack: empty pkg name"; return 1; }
+
+	if ! command -v pwsh >/dev/null; then epr "superpack-unpack: PowerShell (pwsh) not found"; return 1; fi
+	command -v adb >/dev/null || {
+		local adb_root="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+		if [ -n "$adb_root" ] && [ -x "$adb_root/platform-tools/adb" ]; then export PATH="$adb_root/platform-tools:$PATH"; fi
+	}
+	command -v adb >/dev/null || { epr "superpack-unpack: adb not found (platform-tools)"; return 1; }
+
+	# newest Android SDK build-tools d8 (the upstream resolver only knows d8.bat on Windows)
+	local sdk="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
+	[ -d "$sdk" ] || sdk=""
+	if [ -z "$sdk" ] && [ -d "$HOME/Android/Sdk" ]; then sdk="$HOME/Android/Sdk"; fi
+	d8=$(find "${sdk:-/nonexistent}/build-tools" -maxdepth 2 -name d8 -type f 2>/dev/null | sort -V | tail -1)
+	[ -n "$d8" ] || { epr "superpack-unpack: no d8 in the Android SDK build-tools (set ANDROID_SDK_ROOT)"; return 1; }
+
+	# which tag/commit of the patch repo to fetch the unpacker from: an explicit
+	# superpack-ref wins; otherwise the pinned tag, or the latest release when
+	# patches-version is 'latest' (the unpacker isn't in a release yet as of
+	# 2026-11-12 - see config.toml)
+	ref="$superpack_ref"
+	if [ -z "$ref" ]; then
+		ref="$patches_ver"
+		if [ "$ref" = "latest" ] || [ "$ref" = "dev" ] || [ -z "$ref" ]; then
+			ref=$(gh_req "https://api.github.com/repos/${patches_src}/releases/latest" - | jq -r '.tag_name // empty') || ref=""
+		fi
+	fi
+	[ -n "$ref" ] || { epr "superpack-unpack: could not resolve the ${patches_src} release for the unpacker"; return 1; }
+	pr "Fetching the HushFacebook superpack unpacker (${ref})"
+	work="$TEMP_DIR/superpack-${ref}"
+	rm -rf "$work"
+	mkdir -p "$work/scripts"
+	local base="https://raw.githubusercontent.com/${patches_src}/${ref}/scripts"
+	local rel
+	for rel in \
+		superpack-unpack.ps1 Resolve-Java.ps1 injected-register-contracts.ps1 \
+		superpack/com/facebook/superpack/AssetDecompressionException.java \
+		superpack/com/facebook/superpack/AssetDecompressor.java \
+		superpack/com/facebook/superpack/SuperpackArchive.java \
+		superpack/com/facebook/superpack/SuperpackFile.java \
+		superpack/compile-only/android/content/res/AssetManager.java \
+		superpack/hushfacebook/superpack/DecodeStore.java \
+		superpack/hushfacebook/superpack/StorelessApk.java; do
+		mkdir -p "$work/scripts/$(dirname "$rel")"
+		if ! gh_dl "$work/scripts/$rel" "$base/$rel"; then
+			epr "superpack-unpack: could not fetch scripts/$rel from ${patches_src}@${ref}"
+			return 1
+		fi
+	done
+
+	# which library can the device load? the stock (arm64-v8a) APK carries its own,
+	# but only for 64-bit ARM devices - otherwise fetch the x86_64 build of the
+	# same version just for libsuperpack-jni.so
+	local library_args=()
+	local abi
+	abi=$(adb ${serial:+-s "$serial"} getprop ro.product.cpu.abi 2>/dev/null | tr -d '\r') || abi=""
+	if [ -z "$abi" ]; then
+		epr "superpack-unpack: could not read the device's CPU ABI from adb"
+		return 1
+	elif [ "$abi" != "arm64-v8a" ]; then
+		lib_apk="${TEMP_DIR}/${pkg_name}-${version}-x86_64-superpack-lib.apk"
+		if [ ! -f "$lib_apk" ]; then
+			pr "Downloading the x86_64 build of ${pkg_name} ${version} (decoder library only)"
+			if ! dl_apkpure "$pkg_name" "$version" "$lib_apk" "x86_64" ""; then
+				epr "superpack-unpack: could not download an x86_64 ${pkg_name} ${version} build for the decoder library"
+				return 1
+			fi
+		fi
+		library_args+=(-LibraryFrom "$lib_apk")
+	fi
+
+	local out="${stock_apk}.storeless.apk"
+	rm -f "$out"
+	local -a sp_args=(-InputPath "$stock_apk" -OutputPath "$out" -D8 "$d8" "${library_args[@]}")
+	[ -n "$serial" ] && sp_args+=(-Serial "$serial")
+	pr "Unpacking the Android 9+ DEX store on the device (${abi})"
+	if ! pwsh -NoProfile -File "$work/scripts/superpack-unpack.ps1" "${sp_args[@]}"; then
+		epr "superpack-unpack: the unpacker failed for '${stock_apk}'"
+		return 1
+	fi
+
+	# the storeless APK is unsigned; the patcher signs it
+	rm -f "${stock_apk}.xapk" "${stock_apk}.apkm"
+	mv -f "$out" "$stock_apk"
+	return 0
+}
+
 # -------------------- apkmirror --------------------
 apkmirror_search() {
 	local resp="$1" dpi="$2" arch="$3" apk_bundle="$4"
@@ -1028,6 +1131,15 @@ build_rv() {
 		done
 		if [ ! -f "$stock_apk" ]; then
 			epr "Stock apk not found ($stock_apk)"
+			return 0
+		fi
+	fi
+
+	if [ "${args[superpack_unpack]:-false}" = "true" ]; then
+		if unzip -p "$stock_apk" assets/secondary-program-dex-jars/metadata.txt 2>/dev/null | grep -q '^\.root_relative'; then
+			pr "Stock APK is already in the Android 11+ layout; skipping the unpack"
+		elif ! superpack_unpack "$stock_apk" "$pkg_name" "$version" "$arch" "${args[patches_src]}" "${args[patches_ver]}" "${args[superpack_ref]:-}"; then
+			epr "superpack-unpack failed for '${table}'; not building it"
 			return 0
 		fi
 	fi
