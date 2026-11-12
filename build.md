@@ -1,18 +1,22 @@
 Notesnook: 3.4.15  
+Truecaller: 26.44.6  
 
 Install [Microg](https://github.com/MorpheApp/MicroG-RE/) for non-root YouTube and YT Music APKs  
 Use [zygisk-detach](https://github.com/j-hc/zygisk-detach) to detach YouTube and YT Music modules from Play Store  
 
 [revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module)
   
-Patches: hxreborn/morphe-patches/patches-1.76.0.mpp  
-[Changelog](https://github.com/hxreborn/morphe-patches/releases/tag/v1.76.0)
+Patches: heval99/Heval-Morphe-Patches/patches-2.3.0.mpp  
+[Changelog](https://github.com/heval99/Heval-Morphe-Patches/releases/tag/v2.3.0)
+
+Patches: hxreborn/morphe-patches/patches-1.77.0.mpp  
+[Changelog](https://github.com/hxreborn/morphe-patches/releases/tag/v1.77.0)
 
 CLI: MorpheApp/morphe-cli/morphe-desktop-2.1.1-all.jar    
 
 Rebuilt because:  
-Notesnook: patches updated  
+Notesnook: patches updated
+Truecaller: patches updated  
 
 Not built (up to date):  
-Pinterest: up to date (patches-0.0.5.mpp)
-Truecaller: up to date (patches-2.2.0.mpp)  
+Pinterest: up to date (patches-0.0.5.mpp)  
