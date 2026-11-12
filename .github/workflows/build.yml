@@ -67,46 +67,6 @@ jobs:
           fi
           echo "SKIP=$SKIP" >> "$GITHUB_OUTPUT"
           echo "SEED_ONLY=$SEED_ONLY" >> "$GITHUB_OUTPUT"
-          if [ "$SKIP" != "true" ]; then
-            CFG_FILE=config.json; [ -f "$CFG_FILE" ] || CFG_FILE=config.toml
-            SUPERPACK=$(python3 -c "
-          import sys, json
-          try:
-              import tomllib
-              d = tomllib.load(open(sys.argv[1], 'rb'))
-          except Exception:
-              d = json.load(open(sys.argv[1]))
-          print('true' if any(isinstance(v, dict) and v.get('superpack-unpack') is True and v.get('enabled', True) for v in d.values()) else 'false')
-          " "$CFG_FILE")
-            echo "SUPERPACK_NEEDED=$SUPERPACK" >> "$GITHUB_OUTPUT"
-          else
-            echo "SUPERPACK_NEEDED=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Boot Android emulator (apps with superpack-unpack need it)
-        id: superpack_emulator
-        if: ${{ inputs.force_all == true || steps.update_cfg.outputs.SUPERPACK_NEEDED == 'true' }}
-        shell: bash
-        run: |
-          set -euxo pipefail
-          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-}}"
-          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$SDK/cmdline-tools/latest/bin/sdkmanager" --install "emulator" "platform-tools" "system-images;android-29;google_apis;x86_64"
-          echo no | "$SDK/cmdline-tools/latest/bin/avdmanager" create avd --force -n ci-superpack -k "system-images;android-29;google_apis;x86_64" -d "pixel_2" \
-            || echo no | "$SDK/cmdline-tools/latest/bin/avdmanager" create avd --force -n ci-superpack -k "system-images;android-29;google_apis;x86_64"
-          nohup "$SDK/emulator/emulator" -avd ci-superpack -no-window -no-audio -no-snapshot -gpu swiftshader_indirect -no-metrics > emulator.log 2>&1 &
-          echo $! > emulator.pid
-          ADB="$SDK/platform-tools/adb"
-          timeout 90 "$ADB" wait-for-device || true
-          boot=""
-          for i in $(seq 1 150); do
-            boot=$("$ADB" shell getprop sys.boot_completed | tr -d '\r' || true)
-            if [ "$boot" = "1" ]; then echo "emulator booted after ~$((i * 2))s"; break; fi
-            sleep 2
-          done
-          if [ "$boot" != "1" ]; then echo "emulator did not boot in time"; cat emulator.log || true; exit 1; fi
-          echo "ANDROID_SERIAL=$("$ADB" get-serialno | tr -d '\r')" >> "$GITHUB_ENV"
-          echo "$SDK/platform-tools" >> "$GITHUB_PATH"
 
       - name: Get next version code
         id: next_ver_code
@@ -125,11 +85,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: $GITHUB_REPOSITORY
           NEXT_VER_CODE: ${{ steps.next_ver_code.outputs.NEXT_VER_CODE }}
-
-      - name: Stop the Android emulator
-        if: ${{ always() && steps.superpack_emulator.outcome != 'skipped' }}
-        shell: bash
-        run: pkill -f "ci-superpack" || true
 
       - name: Get output
         id: get_output

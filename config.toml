@@ -1,5 +1,5 @@
 # my-morphe-builder - builds patched APKs with Morphe patches
-# see https://github.com/hxreborn/morphe-patches, https://github.com/heval99/Heval-Morphe-Patches, https://github.com/SysAdminDoc/HushPinterest and https://github.com/SysAdminDoc/HushFacebook
+# see https://github.com/hxreborn/morphe-patches, https://github.com/heval99/Heval-Morphe-Patches and https://github.com/SysAdminDoc/HushPinterest
 # see CONFIG.md for the full list of options
 enable-module-update = false # release-only flow, no Magisk module update manifests
 parallel-jobs = 1
@@ -59,30 +59,3 @@ cli-version = "latest"
 version = "14.25.0"
 arch = "arm64-v8a"
 apkpure-dlurl = "com.pinterest"
-
-[Facebook]
-# HushFacebook patches officially support only the Android 11+ builds of
-# 586.0.0.52.53 (APKMirror). APKPure only serves the Android 9+ build, whose
-# DEX files sit in a Superpack store the patcher can't read - so after the
-# APK is downloaded and merged, CI unpacks it into the Android 11+ layout on
-# an x86_64 Android emulator (see the 'Boot Android emulator' step in
-# .github/workflows/build.yml and superpack_unpack() in utils.sh). The
-# Android 9+ build is the same version, and the unpack is verified against
-# the SHA-1 hashes inside the APK. The patches were confirmed by the
-# maintainer to work on a patched unpack (Home/Reels), not on a phone.
-patches-source = "SysAdminDoc/HushFacebook"
-patches-version = "latest"
-cli-source = "MorpheApp/morphe-cli"
-cli-version = "latest"
-version = "auto" # resolves to 586.0.0.52.53 (highest version the patches support)
-arch = "arm64-v8a"
-apkpure-dlurl = "com.facebook.katana"
-# runs the upstream superpack unpacker on an adb-connected emulator/device
-# after the download+merge step, before patching. Needs the CI emulator
-# step; on a machine without one, set ANDROID_SERIAL to a connected device.
-superpack-unpack = true
-# no HushFacebook release contains the unpacker yet (v0.21.0 predates it),
-# so it is pinned to a main commit (2026-11-12). Once a release with
-# scripts/superpack ships, drop this line and the unpacker is fetched at
-# the patches' release tag instead.
-superpack-ref = "107d5ccd9bdea18480f4284b96bc3c3d09e814bb"

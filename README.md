@@ -6,12 +6,10 @@ Fork of [j-hc/revanced-magisk-module](https://github.com/j-hc/revanced-magisk-mo
 
 * On a daily schedule, the set of APKs are fetched and then built with their relevant Morphe patches automatically in the cloud. No need to locally build apps. It is recommended to use this repo with [[#Obtainium]]. 
 * It currently builds the following apps:
-	* **Facebook** – [SysAdminDoc/HushFacebook](https://github.com/SysAdminDoc/HushFacebook)
 	* **Notesnook** – [hxreborn/morphe-patches](https://github.com/hxreborn/morphe-patches)
 	* **Pinterest** – [SysAdminDoc/HushPinterest](https://github.com/SysAdminDoc/HushPinterest)
 	* **Truecaller** – [heval99/Heval-Morphe-Patches](https://github.com/heval99/Heval-Morphe-Patches)
 * The project supports the **arm64-v8a** architecture only.
-* Facebook is built from the Android 9+ build that APKPure serves: CI decodes its packed DEX files on a temporary emulator before patching (the patches officially target the Android 11+ build).
 
 ## Obtainium
 

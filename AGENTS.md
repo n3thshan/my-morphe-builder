@@ -8,7 +8,7 @@ Guidance for AI agents working in this repository. Read this before making any c
 
 The user is not a developer. **Write and talk in plain, simple English.** Ask questions instead of guessing. Do only what the user asks. Keep answers short.
 
-The user uses **Notesnook**. The user's mom uses **Truecaller** and **Pinterest**. The user's uncle uses **Facebook**. Everything works today — keep it working.
+The user uses **Notesnook**. The user's mom uses **Truecaller** and **Pinterest**. Everything works today — keep it working.
 
 **Google Photos** was removed from the project on 2026-11-07 at the user's confirmation. Do not re-add it without asking.
 
@@ -29,14 +29,14 @@ Releases contain only the changed apps, and release notes are the changelog. [Ob
 
 1. **arm64-v8a only.** Never introduce other ABIs (no armeabi-v7a, x86, x86_64, multi-AB builds) without explicit approval from the user.
 2. **Bundled keystores sign everything.** `ks.keystore` signs the final patched APKs; `ks-p12.keystore` signs the stock merge step. Do not add per-app key management. See "Signing keys" below before touching either file.
-3. **APKPure stays the Truecaller, Pinterest and Facebook source.** Do not remove the `apkpure` download source, the apkeep workflow step, or the `arm64_ok` guard. Keep `apkeep -d apk-pure` as apkeep's only download source. Notesnook keeps the official Notesnook endpoint.
+3. **APKPure stays the Truecaller and Pinterest source.** Do not remove the `apkpure` download source, the apkeep workflow step, or the `arm64_ok` guard. Keep `apkeep -d apk-pure` as apkeep's only download source. Notesnook keeps the official Notesnook endpoint.
 4. **`patches-version = "latest"`** is intentional, except **Pinterest**, deliberately pinned to `v0.0.5` (and `version = "14.25.0"`) by the user (2026-11-05): newer releases target Pinterest builds APKPure does not carry, and v0.0.6+ dropped `14.25.0` support. Don't unpin it until APKPure carries a build a newer patch release supports. The user wants all apps up to date — if a pin or source lag is blocking that, **tell the user and let them decide**. Never change a pin or source on your own.
-5. **Don't bump app `version`s without checking patch support first.** Verify against the bundle's `patches-list.json` (hxreborn's for Notesnook; heval99/Heval-Morphe-Patches' for Truecaller; HushPinterest's for Pinterest; HushFacebook's for Facebook) and check the source serves that version.
+5. **Don't bump app `version`s without checking patch support first.** Verify against the bundle's `patches-list.json` (hxreborn's for Notesnook; heval99/Heval-Morphe-Patches' for Truecaller; HushPinterest's for Pinterest) and check the source serves that version.
 6. **Agent edits files; the user pushes.** No commits or pushes unless the user explicitly asks. No `git remote` operations. No `gh` calls (there is no `gh` here).
 7. **Don't add apps without asking.** The user has not decided on more apps yet. See "Adding an app" for the procedure if the user says yes.
 8. **Download sources** are only the ones already in `config.toml`/`utils.sh` (`official-dlurl`, `apkpure-dlurl`, `direct-dlurl`, `archive-dlurl`, `apkmirror-dlurl`). No scraped or unofficial sources without the user's say-so.
 9. **No Google Photos.** It was dropped 2026-11-07. If the user wants it back, tell them it needs a decision again — including package rename `app.morphe.android.apps.photos` vs official package, and force-patching.
-10. **Facebook must keep the APKPure source and the superpack unpack.** Added 2026-11-12 by user decision (it was dropped earlier for lack of a free source for the patchable build). APKPure only serves the Android 9+ build (`com.facebook.katana` 586.0.0.52.53, minSdk 28), whose DEX files sit in a Superpack store the patcher can't read — so CI unpacks it on a temporary x86_64 Android emulator before patching. Don't change the source, the emulator step, `superpack_unpack()`, or the `superpack-ref` pin without asking. The pin (a main commit) exists only until a HushFacebook release ships the unpacker; dropping it then is the planned step, but confirm with the user first. The Android 11+ build (APKMirror, the patches' official target) is behind a Cloudflare challenge and can't be scraped reliably; that stays a manual download the user hasn't wanted.
+10. **No Facebook.** It stays dropped (no free automated source for the patchable build). Don't re-add it.
 
 ## Signing keys (public, on purpose)
 
@@ -60,7 +60,7 @@ What this means:
 | `sig.txt` | Allowlist of stock-APK signature certs; **none of the current apps are listed**, so the check is a no-op |
 | `obtainium-import.json` | Obtainium import file for the public builds — update it when apps/packages/filters change |
 | `.github/workflows/ci.yml` | Daily cron 16:00 UTC + manual dispatch; decides whether to build; calls `build.yml` |
-| `.github/workflows/build.yml` | Build + release flow — **still named "Build Modules"** (a leftover name; see Known issues). Boots a temporary x86_64 Android emulator first when an app with `superpack-unpack = true` is being built |
+| `.github/workflows/build.yml` | Build + release flow — **still named "Build Modules"** (a leftover name; see Known issues) |
 | `.gitattributes` | LF enforced for text, binary marking — do not remove or relax |
 | `module/` | Magisk module template — **unused** (all apps are `build-mode = "apk"`); leave alone |
 | `build-termux.sh` | **Stale upstream script** — it clones upstream, not this repo; don't use (see Known issues) |
@@ -77,9 +77,8 @@ User keeps **`README.md`** short on purpose (rewritten 2026-11-07): apps list wi
 | **Notesnook** | `hxreborn/morphe-patches` (`latest`) | `auto` (highest supported, currently **3.4.15**) | Official endpoint (`official-dlurl`, 302 → official asset) | hxreborn v1.73.0: supports 3.4.12–3.4.15. If the endpoint serves something newer than patches support, the patch step fails loudly — expected; wait or pin. |
 | **Truecaller** | `heval99/Heval-Morphe-Patches` (`latest`) | `auto` (currently **26.43.5**) | APKPure via apkeep | heval v2.2.0: 30 patches, **26.43.5 only**, includes GmsCore support; package stays `com.truecaller`; merged from XAPK. |
 | **Pinterest** | `SysAdminDoc/HushPinterest` (**`v0.0.5` pinned**) | **`14.25.0` pinned** | APKPure via apkeep | v0.0.5 = 23 patches, **no** GmsCore / push-notification patches (email + password login). APKPure only offers up to 14.25.0. **Temporary pin** (2026-11-05, user decision): unpin once APKPure mirrors a build a newer HushPinterest release supports, then tell the user first. |
-| **Facebook** | `SysAdminDoc/HushFacebook` (`latest`) | `auto` (currently **586.0.0.52.53**) | APKPure via apkeep (Android 9+ build) | The Android 9+ build stores its DEX files in a Superpack archive. CI decodes it on a temporary x86_64 emulator (`superpack_unpack()` in `utils.sh`) into the Android 11+ layout before patching. Maintainer confirmed a patched unpack runs (Home/Reels) on Android 16; untested on Android 9/10 phones. Not in `sig.txt` (signature check skipped). |
 
-Status as of 2026-11-12 (Facebook added); check patches-list.json and the APKPure API when you change anything.
+Status as of 2026-11-07; check patches-list.json and the APKPure API when you change anything.
 
 ## Building blocks and the state system
 
@@ -106,16 +105,13 @@ Status as of 2026-11-12 (Facebook added); check patches-list.json and the APKPur
 12. **`sig.txt`** matches nothing — signature checks are effectively disabled for all apps.
 13. **Both workflows have `permissions: write-all`** — broader than needed.
 14. **Stale leftovers:** `build-termux.sh` (clones upstream), the `module/` folder, the ReVanced-era bug report template, `dummy-update.json` on the `update` branch, `bin/htmlq` and `bin/aapt2` (only used on dead code paths).
-15. **Facebook's CI unpack needs the emulator.** If the x86_64 emulator fails to boot (no KVM, sdkmanager trouble, image download flake), the `Boot Android emulator` step fails and — with default GitHub Actions behavior — the whole job stops before `build.sh` runs. The other apps are not rebuilt that day either. If you'd rather a Facebook failure not block the rest, that needs a decision (and probably `continue-on-error` on the emulator step).
-16. **`config_update` ignores `superpack-unpack` and `superpack-ref`.** Changing only those keys (or the emulator setup) doesn't trigger a rebuild; use `force_all`. Also, the Android 9+ DEX compatibility with HushFacebook's patches is maintainer-confirmed only for Home/Reels — another patch may fail loudly on a rebuild; check the release assets when in doubt.
-17. **Facebook ships as `arm64-v8a` but decodes via an x86_64 build.** The x86_64 XAPK is downloaded too, only for its `libsuperpack-jni.so` (decoder library for the emulator); the file being patched stays the arm64-v8a one. Don't "simplify" this to a single download or the decoder can't run. The unpacker scripts are fetched at build time; `superpack-ref` in config.toml pins them to a main commit (2026-11-12) because no release ships them yet — drop that line once a HushFacebook release with `scripts/superpack/` is out (then it follows the patches' release tag).
 
 ## Conventions
 
 - **CI is the test suite.** Verify scripts with `bash -n build.sh utils.sh` and leave real verification to GitHub Actions. Don't claim a build works without that check (or a runner log).
 - **Config is king.** No per-app hard-coding in scripts. A new app means a `[Table]` in `config.toml`, not a code path.
 - **Docs travel with changes.** If behavior changes, update `README.md`, `obtainium-import.json` and this file in the same change. Keep releases and the release note changes in mind.
-- **Ask before expanding scope.** Do not fix issues #1–#17 above on your own; list them and let the user choose.
+- **Ask before expanding scope.** Do not fix issues #1–#14 above on your own; list them and let the user choose.
 - **Plain English in everything the user reads.** No jargon without an explanation.
 - Commit messages: only when the user asks for a commit — plain, descriptive.
 
@@ -156,8 +152,7 @@ Read the failing step's log before changing anything:
 - "Could not download" → source/network; for APKPure apps, check the free API coverage.
 - `get_patch_last_supported_ver failed` or empty output → CLI output changed or the patch list is unsupported — pin `version` temporarily and tell the user.
 - Install/patch step failures → usually a version pin mismatch.
-- "superpack-unpack failed" → the x86_64 emulator didn't boot, or the unpacker refused (look for the device decode output: lines starting MISMATCH/UNLISTED/MISSING/REFUSED mean the store didn't match the APK), or the adb/d8/pwsh tooling was missing. The unpacker output goes to the job log.
-- If one app failed but others succeeded, the release still publishes — inspect assets and the build log. (Facebook is the exception: if its CI emulator step fails, the job stops before anything builds.)
+- If one app failed but others succeeded, the release still publishes — inspect assets and the build log.
 
 ### Forcing or resetting a rebuild
 
@@ -167,14 +162,13 @@ Read the failing step's log before changing anything:
 
 ## User preferences and history
 
-- The user had Google Photos removed on 2026-11-07 for personal reasons (other apps cover it; releases stayed 3 apps).
-- **Facebook was re-added on 2026-11-12 (user decision)** after the HushFacebook maintainer pointed out his `scripts/superpack/` desktop unpacker: APKPure only serves the Android 9+ build, so CI now unpacks it on a temporary x86_64 emulator before patching. The user wants it for the user's uncle (sharp links). The maintainer confirmed a patched unpack works (Home/Reels); the Android 9/10 phone case is untested.
+- The user had Google Photos removed on 2026-11-07 for personal reasons (other apps cover it; releases stay 3 apps).
 - The user wants every app kept up to date as far as sources allow; temporary pins (Pinterest) are forced by source lag, not taste. **If a pin can be relaxed, tell the user — they will decide.**
 - The user's mom uses Truecaller and Pinterest; they should keep working.
 - Keep upstream sync **once in a while**, deliberately — agents propose, the user merges.
-- Upstream **HushPinterest and HushFacebook are not the user's project** — treat them as third-party sources.
+- Upstream **HushPinterest is not the user's project** — treat it as a third-party source.
 - User notifications: GitHub emails are enough; no other channel needed.
-- Repo created 2026-11-04; releases 1–9 as of 2026-11-07, all 9 CI runs green; Facebook added 2026-11-12; sole maintainer **n3thshan**; issues enabled but none open.
+- Repo created 2026-11-04; releases 1–9 as of 2026-11-07, all 9 CI runs green; sole maintainer **n3thshan**; issues enabled but none open.
 
 ## When unsure
 
