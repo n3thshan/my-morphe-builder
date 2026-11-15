@@ -1,3 +1,4 @@
+Facebook: 586.0.0.52.53  
 Notesnook: 3.4.15  
 Pinterest: 14.25.0  
 Truecaller: 26.44.6  
