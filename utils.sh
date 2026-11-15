@@ -567,6 +567,83 @@ merge_splits() {
 	return 0
 }
 
+# -------------------- superpack-unpack (HushFacebook Android 9+ stock APK) --------------------
+# Facebook's Android 9+ builds keep almost all of their DEX files in a "Superpack"
+# store that only the app's native library can decode, so the patcher sees almost
+# nothing. This rewrites the merged stock APK into the Android 11+ layout (DEX
+# files in the root) the patcher can read. It drives the upstream -Desktop decoder
+# (fetched at build time; see superpack-ref in config.toml for the exact pin),
+# which runs the APK's arm64 libsuperpack-jni.so under unidbg, an ARM emulator for
+# Android native libraries - no phone or emulator needed. Every DEX file is
+# checked against the SHA-1 hashes in the APK's own metadata.txt. The result is
+# unsigned; the patcher signs it.
+superpack_unpack() {
+	local stock_apk=$1 pkg_name=$2 version=$3 arch=$4 patches_src=$5 patches_ver=$6 superpack_ref=$7
+	local ref work
+	[ "$arch" = "arm64-v8a" ] || { epr "superpack-unpack: only arm64-v8a is supported"; return 1; }
+	[ -n "$pkg_name" ] || { epr "superpack-unpack: empty pkg name"; return 1; }
+
+	if ! command -v pwsh >/dev/null; then epr "superpack-unpack: PowerShell (pwsh) not found"; return 1; fi
+	if ! java -version >/dev/null 2>&1; then epr "superpack-unpack: java not found; the desktop decoder needs JDK 21+"; return 1; fi
+
+	# which commit of the patch repo to fetch the desktop unpacker from: an explicit
+	# superpack-ref wins; otherwise the latest release (as of 2026-11-15 no release
+	# ships the -Desktop mode yet - see config.toml)
+	ref="$superpack_ref"
+	if [ -z "$ref" ]; then
+		ref="$patches_ver"
+		if [ "$ref" = "latest" ] || [ "$ref" = "dev" ] || [ -z "$ref" ]; then
+			ref=$(gh_req "https://api.github.com/repos/${patches_src}/releases/latest" - | jq -r '.tag_name // empty') || ref=""
+		fi
+	fi
+	[ -n "$ref" ] || { epr "superpack-unpack: could not resolve a ref for the desktop unpacker"; return 1; }
+	pr "Fetching the HushFacebook superpack desktop unpacker (${ref})"
+	work="$TEMP_DIR/superpack-${ref}"
+	rm -rf "$work"
+	mkdir -p "$work"
+	local base="https://raw.githubusercontent.com/${patches_src}/${ref}"
+	local rel
+	for rel in \
+		scripts/superpack-unpack.ps1 scripts/Resolve-Java.ps1 scripts/injected-register-contracts.ps1 \
+		scripts/superpack/com/facebook/superpack/AssetDecompressionException.java \
+		scripts/superpack/com/facebook/superpack/AssetDecompressor.java \
+		scripts/superpack/com/facebook/superpack/SuperpackArchive.java \
+		scripts/superpack/com/facebook/superpack/SuperpackFile.java \
+		scripts/superpack/compile-only/android/content/res/AssetManager.java \
+		scripts/superpack/hushfacebook/superpack/DecodeStore.java \
+		scripts/superpack/hushfacebook/superpack/StorelessApk.java \
+		scripts/superpack-desktop/settings.gradle.kts \
+		scripts/superpack-desktop/build.gradle.kts \
+		scripts/superpack-desktop/gradle/verification-metadata.xml \
+		scripts/superpack-desktop/src/main/java/hushfacebook/superpack/desktop/DecoderEmulator.java \
+		scripts/superpack-desktop/src/main/java/hushfacebook/superpack/desktop/DesktopDecode.java \
+		scripts/superpack-desktop/src/main/java/hushfacebook/superpack/desktop/EmulatedSuperpack.java \
+		scripts/superpack-desktop/src/main/java/hushfacebook/superpack/desktop/Relr.java \
+		gradlew gradlew.bat \
+		gradle/wrapper/gradle-wrapper.jar \
+		gradle/wrapper/gradle-wrapper.properties; do
+		mkdir -p "$work/$(dirname "$rel")"
+		if ! gh_dl "$work/$rel" "$base/$rel"; then
+			epr "superpack-unpack: could not fetch $rel from ${patches_src}@${ref}"
+			return 1
+		fi
+	done
+	chmod +x "$work/gradlew" 2>/dev/null || true
+
+	local out="${stock_apk}.storeless.apk"
+	rm -f "$out"
+	pr "Unpacking the Android 9+ DEX store on this machine (unidbg)"
+	if ! pwsh -NoProfile -File "$work/scripts/superpack-unpack.ps1" -Desktop -InputPath "$stock_apk" -OutputPath "$out"; then
+		epr "superpack-unpack: the desktop unpacker failed for '${stock_apk}'"
+		return 1
+	fi
+
+	# the storeless APK is unsigned; the patcher signs it
+	rm -f "${stock_apk}.xapk" "${stock_apk}.apkm"
+	mv -f "$out" "$stock_apk"
+	return 0
+}
+
 # -------------------- apkmirror --------------------
 apkmirror_search() {
 	local resp="$1" dpi="$2" arch="$3" apk_bundle="$4"
@@ -1028,6 +1105,15 @@ build_rv() {
 		done
 		if [ ! -f "$stock_apk" ]; then
 			epr "Stock apk not found ($stock_apk)"
+			return 0
+		fi
+	fi
+
+	if [ "${args[superpack_unpack]:-false}" = "true" ]; then
+		if unzip -p "$stock_apk" assets/secondary-program-dex-jars/metadata.txt 2>/dev/null | grep -q '^\.root_relative'; then
+			pr "Stock APK is already in the Android 11+ layout; skipping the unpack"
+		elif ! superpack_unpack "$stock_apk" "$pkg_name" "$version" "$arch" "${args[patches_src]}" "${args[patches_ver]}" "${args[superpack_ref]:-}"; then
+			epr "superpack-unpack failed for '${table}'; not building it"
 			return 0
 		fi
 	fi

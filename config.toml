@@ -1,5 +1,5 @@
 # my-morphe-builder - builds patched APKs with Morphe patches
-# see https://github.com/hxreborn/morphe-patches, https://github.com/heval99/Heval-Morphe-Patches and https://github.com/SysAdminDoc/HushPinterest
+# see https://github.com/hxreborn/morphe-patches, https://github.com/heval99/Heval-Morphe-Patches, https://github.com/SysAdminDoc/HushPinterest and https://github.com/SysAdminDoc/HushFacebook
 # see CONFIG.md for the full list of options
 enable-module-update = false # release-only flow, no Magisk module update manifests
 parallel-jobs = 1
@@ -59,3 +59,29 @@ cli-version = "latest"
 version = "14.25.0"
 arch = "arm64-v8a"
 apkpure-dlurl = "com.pinterest"
+
+[Facebook]
+# HushFacebook patches officially support only the Android 11+ builds of
+# 586.0.0.52.53 (APKMirror). APKPure only serves the Android 9+ build, whose
+# DEX files sit in a Superpack store the patcher can't read - so after the
+# APK is downloaded and merged, CI decodes its store on the runner itself,
+# with the arm64 library running under unidbg (the upstream -Desktop mode of
+# scripts/superpack-unpack.ps1). The decode is verified against the SHA-1
+# hashes inside the APK's own metadata.txt. Needs JDK 21+ on the runner,
+# which the build job already has. The maintainer confirmed a patched unpack
+# works (Home/Reels), not on a phone.
+patches-source = "SysAdminDoc/HushFacebook"
+patches-version = "latest"
+cli-source = "MorpheApp/morphe-cli"
+cli-version = "latest"
+version = "auto" # resolves to 586.0.0.52.53 (highest version the patches support)
+arch = "arm64-v8a"
+apkpure-dlurl = "com.facebook.katana"
+# runs the upstream superpack desktop unpacker after the download+merge
+# step, before patching. No phone or emulator needed.
+superpack-unpack = true
+# the -Desktop mode isn't in any release yet (v0.22.0 predates it), so the
+# fetch is pinned to a main commit (2026-11-15). Once a release with
+# -Desktop ships, drop this line and the unpacker follows the patches'
+# release tag instead.
+superpack-ref = "2301cfafe97fe75510700c3d872ef7987d4183c4"
