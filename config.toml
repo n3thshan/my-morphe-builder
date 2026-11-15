@@ -80,14 +80,15 @@ apkpure-dlurl = "com.facebook.katana"
 # runs the upstream superpack desktop unpacker after the download+merge
 # step, before patching. No phone or emulator needed.
 superpack-unpack = true
-# the patcher offers --continue-on-error to skip patches that refuse on this
-# build instead of aborting (currently only "Tab bar at the bottom" is known
-# to fail on the Android 9+ build - its target code is obfuscated differently
-# from the Android 11+ build the patch was written for). Added 2026-11-15 to
-# measure how many other patches fail the same way; remove once known and use
-# excluded-patches instead. Changing this key does NOT retrigger a build -
-# use force_all.
-patcher-args = "--continue-on-error"
+# "Tab bar at the bottom" is the one patch that refuses to patch on the
+# Android 9+ build (its target code is obfuscated differently from the
+# Android 11+ build the patch was written for) - excluded 2026-11-15; the
+# measurement run showed it's the only failure. If a NEW patch starts
+# failing, the Facebook build now fails loudly instead of silently shipping
+# more missing patches. Note: excluding it means no "Tab bar at the bottom"
+# feature; everything else applies. Changing this key doesn't retrigger a
+# build - use force_all.
+excluded-patches = "\"Tab bar at the bottom\""
 # the -Desktop mode isn't in any release yet (v0.22.0 predates it), so the
 # fetch is pinned to a main commit (2026-11-15). Once a release with
 # -Desktop ships, drop this line and the unpacker follows the patches'
