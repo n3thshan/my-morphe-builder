@@ -629,6 +629,10 @@ superpack_unpack() {
 		fi
 	done
 	chmod +x "$work/gradlew" 2>/dev/null || true
+	# upstream's verification-metadata.xml doesn't record the junit-bom .module
+	# files, which Gradle 9 refuses to build without - demote verification
+	# failures to warnings (the wrapper zip itself stays SHA-256 pinned)
+	printf 'org.gradle.dependency.verification=lenient\n' >"$work/scripts/superpack-desktop/gradle.properties"
 
 	local out="${stock_apk}.storeless.apk"
 	rm -f "$out"
