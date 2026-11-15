@@ -109,13 +109,14 @@ Status as of 2026-11-15 (Facebook re-added); check patches-list.json and the APK
 15. **Facebook's unidbg decode needs network on every rebuild.** It fetches the Gradle 9.8.2 wrapper distribution (SHA-pinned) and unidbg from Maven Central, on every Facebook build. Upstream's `verification-metadata.xml` doesn't record the junit-bom `.module` files, so `utils.sh` writes `org.gradle.dependency.verification=lenient` into the fetched decoder build — verification failures become warnings, not build failures. If network to Gradle/Maven Central flakes, the Facebook build fails loudly — other apps still ship, as with any app failure.
 16. **`config_update` ignores `superpack-unpack` and `superpack-ref`.** Changing only those keys doesn't trigger a rebuild; use `force_all`. Also, the Android 9+ DEX compatibility with HushFacebook's patches is maintainer-confirmed only for Home/Reels — another patch may fail loudly on a rebuild; check the release assets when in doubt.
 17. **The `superpack-ref` pin tracks a main commit until a release ships the `-Desktop` mode.** As of 2026-11-15, only the HushFacebook `v0.22.0` release exists (it doesn't contain `-Desktop`); the pin (`2301cfa…`, 2026-11-15) is fetched raw at build time. When a release ships the `-Desktop` mode, drop the `superpack-ref` line — ask the user first.
+18. **Facebook ships with `--continue-on-error` (2026-11-15).** "Tab bar at the bottom" refuses to patch on the Android 9+ build (its target code is obfuscated differently from the Android 11+ build). We temporarily skip failing patches to measure how many others fail the same way. `config_update` ignores `patcher-args`, so `force_all` is needed to rebuild. Plan: once the failure list is known, switch to `excluded-patches` with exactly those names (build fails loudly on new failures) or keep shipping with gaps — user decides.
 
 ## Conventions
 
 - **CI is the test suite.** Verify scripts with `bash -n build.sh utils.sh` and leave real verification to GitHub Actions. Don't claim a build works without that check (or a runner log).
 - **Config is king.** No per-app hard-coding in scripts. A new app means a `[Table]` in `config.toml`, not a code path.
 - **Docs travel with changes.** If behavior changes, update `README.md`, `obtainium-import.json` and this file in the same change. Keep releases and the release note changes in mind.
-- **Ask before expanding scope.** Do not fix issues #1–#17 above on your own; list them and let the user choose.
+- **Ask before expanding scope.** Do not fix issues #1–#18 above on your own; list them and let the user choose.
 - **Plain English in everything the user reads.** No jargon without an explanation.
 - Commit messages: only when the user asks for a commit — plain, descriptive.
 
