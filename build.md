@@ -1,4 +1,5 @@
 Facebook: 586.0.0.52.53  
+Notesnook: 3.4.15  
 Pinterest: 14.25.0  
 
 Install [Microg](https://github.com/MorpheApp/MicroG-RE/) for non-root YouTube and YT Music APKs  
@@ -6,6 +7,9 @@ Use [zygisk-detach](https://github.com/j-hc/zygisk-detach) to detach YouTube and
 
 [revanced-magisk-module](https://github.com/j-hc/revanced-magisk-module)
   
+Patches: hxreborn/morphe-patches/patches-1.80.0.mpp  
+[Changelog](https://github.com/hxreborn/morphe-patches/releases/tag/v1.80.0)
+
 Patches: SysAdminDoc/HushFacebook/patches-0.22.0.mpp  
 [Changelog](https://github.com/SysAdminDoc/HushFacebook/releases/tag/v0.22.0)
 
@@ -15,8 +19,8 @@ Patches: SysAdminDoc/HushPinterest/patches-0.0.5.mpp
 
 Rebuilt because:  
 Facebook: patches updated
+Notesnook: patches updated
 Pinterest: patches updated  
 
-Not built (up to date):  
-Notesnook: up to date (patches-1.79.0.mpp)
-Truecaller: up to date (patches-2.3.0.mpp)  
+Could not check (GitHub API failed):  
+Truecaller: GitHub API error  
