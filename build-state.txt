@@ -1,5 +1,5 @@
 Facebook|SysAdminDoc/HushFacebook|-|patches-0.22.0.mpp|sha256:d82a0ff5e03bd11777f8193dc618090779f1a08029a755f5d9b73c362feb7290|auto
 GooglePhotos|Akash-Sriram/morphe-google-photos|-|patches-1.17.11.mpp|sha256:19e3c55610f5f98a96f4c662dceb757fcbaf658115fec6f51cc6a0cbbd3dd6e5|7.99.0.1012983279
-Notesnook|hxreborn/morphe-patches|-|patches-1.85.0.mpp|sha256:c3688bc1ef5ec75cf71a0a07965e6f0d811812280491d69a3567955e5d13ccc5|auto
-Pinterest|SysAdminDoc/HushPinterest|-|patches-0.0.5.mpp|sha256:234e8d602efc9ca83d45a582740f5223cc33ee629a85e8422de24f73de3968f8|14.25.0
-Truecaller|heval99/Heval-Morphe-Patches|-|patches-3.1.0.mpp|sha256:c72c02c9da4307dbd40819b08ca379fdfe480e9af7a497b4c79bde0b8a294d8c|auto
+Notesnook|hxreborn/morphe-patches|-|patches-1.86.0.mpp|sha256:f0c56f88b281837ee29aa2e80a47d7cd9a179f397c47946441866d9d0fcb6c01|auto
+Pinterest|SysAdminDoc/HushPinterest|-|patches-0.0.5.mpp|sha256:cd7052e1358ded7339a41d5ca0bdca50f336c62807aa98d634196f25c703903e|14.25.0
+Truecaller|heval99/Heval-Morphe-Patches|-|patches-3.2.0.mpp|sha256:84552e6e35fff4a8d37f559fc89c2f6ec71381202fb44eda0d829d4421f478d8|auto
